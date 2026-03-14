@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Moodboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Cormorant:ital,wght@0,300;0,400;1,300;1,400&family=DM+Sans:wght@200;300;400&display=swap" rel="stylesheet" />
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:     #F9F5F0;
+  --ink:    #28231F;
+  --dust:   #B3A89F;
+  --white:  #FFFFFF;
+  --shadow: rgba(60,40,20,.13);
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 300;
+  overflow-x: hidden;
+}
+
+body::after {
+  content:''; position:fixed; inset:0; pointer-events:none; z-index:999;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='.035'/%3E%3C/svg%3E");
+  opacity:.6;
+}
+
+/* ─── HEADER ─── */
+header {
+  padding: 2.8rem 3rem 2rem;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  position: relative; z-index: 10;
+  animation: riseUp .8s cubic-bezier(.22,1,.36,1) both;
+}
+
+.site-name {
+  font-family: 'Cormorant', serif;
+  font-size: clamp(3rem, 7vw, 5.5rem);
+  font-weight: 300;
+  line-height: 1;
+  letter-spacing: -.02em;
+  color: var(--ink);
+  text-decoration: none;
+}
+.site-name i { font-style: italic; color: var(--dust); }
+
+.header-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: .55rem;
+  padding-bottom: .3rem;
+}
+
+.header-sub {
+  font-size: .72rem;
+  font-weight: 300;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: var(--dust);
+}
+
+nav { display: flex; gap: 1.8rem; }
+nav a {
+  font-size: .72rem; font-weight: 300;
+  letter-spacing: .13em; text-transform: uppercase;
+  color: var(--dust); text-decoration: none;
+  transition: color .25s;
+}
+nav a:hover { color: var(--ink); }
+
+/* ─── SCATTER ─── */
+.scatter {
+  position: relative;
+  width: 100%;
+  margin-top: 1rem;
+}
+
+.pin {
+  position: absolute;
+  cursor: zoom-in;
+  will-change: transform;
+}
+
+.pin img {
+  display: block;
+  object-fit: cover;
+  box-shadow: 0 6px 30px var(--shadow);
+  pointer-events: none;
+  user-select: none;
+}
+
+/* ─── ABOUT ─── */
+.about {
+  position: relative; z-index: 10;
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 6rem 3rem 3rem;
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 5rem;
+  align-items: end;
+}
+
+.about-quote {
+  font-family: 'Cormorant', serif;
+  font-size: clamp(1.5rem, 2.8vw, 2.2rem);
+  font-weight: 300; line-height: 1.5;
+}
+.about-quote i { color: var(--dust); }
+
+.about-meta { display: flex; flex-direction: column; gap: 1.4rem; }
+.meta-row   { display: flex; flex-direction: column; gap: .15rem; }
+.meta-label {
+  font-size: .68rem; font-weight: 300;
+  letter-spacing: .14em; text-transform: uppercase; color: var(--dust);
+}
+.meta-val {
+  font-family: 'Cormorant', serif;
+  font-size: 1.05rem; color: var(--ink);
+}
+
+/* ─── FOOTER ─── */
+footer {
+  position: relative; z-index: 10;
+  padding: 2.2rem 3rem;
+  margin-top: 4rem;
+  border-top: .5px solid rgba(44,35,28,.1);
+  display: flex; align-items: center; justify-content: space-between;
+}
+footer span { font-size: .75rem; color: var(--dust); }
+.soc { display: flex; gap: 1.6rem; }
+.soc a {
+  font-size: .72rem; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--dust); text-decoration: none; transition: color .25s;
+}
+.soc a:hover { color: var(--ink); }
+
+/* ─── LIGHTBOX ─── */
+.lb {
+  display: none; position: fixed; inset: 0; z-index: 500;
+  background: rgba(249,245,240,.9);
+  backdrop-filter: blur(18px);
+  align-items: center; justify-content: center;
+  cursor: zoom-out;
+}
+.lb.on { display: flex; }
+
+.lb-frame {
+  max-width: 88vw; max-height: 88vh;
+  animation: lbIn .36s cubic-bezier(.22,1,.36,1) both;
+  cursor: default;
+}
+.lb-frame img {
+  display: block;
+  max-width: 88vw; max-height: 85vh;
+  object-fit: contain;
+  box-shadow: 0 16px 64px rgba(60,40,20,.2);
+}
+
+.lb-close {
+  position: fixed; top: 1.6rem; right: 1.8rem;
+  width: 36px; height: 36px; border-radius: 50%;
+  border: .5px solid rgba(44,35,28,.15);
+  background: var(--white); color: var(--dust);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; font-size: 16px; transition: all .22s; z-index: 501;
+}
+.lb-close:hover { background: var(--ink); color: var(--white); }
+
+/* ─── KEYFRAMES ─── */
+@keyframes riseUp {
+  from { opacity:0; transform: translateY(20px); }
+  to   { opacity:1; transform: translateY(0); }
+}
+@keyframes lbIn {
+  from { opacity:0; transform: scale(.92); }
+  to   { opacity:1; transform: scale(1); }
+}
+@keyframes pinIn {
+  from { opacity:0; transform: var(--rot) translateY(18px) scale(.94); }
+  to   { opacity:1; transform: var(--rot) translateY(0)    scale(1); }
+}
+
+/* ─── MOBILE ─── */
+@media (max-width: 700px) {
+  header { padding: 1.8rem; flex-direction: column; align-items: flex-start; gap: 1rem; }
+  .header-right { align-items: flex-start; }
+  .about { grid-template-columns: 1fr; gap: 2.4rem; padding: 4rem 1.8rem 2rem; }
+  footer { flex-direction: column; gap: .8rem; text-align: center; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <a class="site-name" href="#">Your <i>Name</i></a>
+  <div class="header-right">
+    <span class="header-sub">Photography · Memory · Light</span>
+    <nav>
+      <a href="#about">About</a>
+      <a href="mailto:hello@yourname.com">Contact</a>
+    </nav>
+  </div>
+</header>
+
+<section class="scatter" id="scatter"></section>
+
+<section class="about" id="about">
+  <p class="about-quote">
+    I collect <i>quiet moments</i> — soft light, the space between things, mornings no one else remembers.
+  </p>
+  <div class="about-meta">
+    <div class="meta-row">
+      <span class="meta-label">Based in</span>
+      <span class="meta-val">Your City</span>
+    </div>
+    <div class="meta-row">
+      <span class="meta-label">Focus</span>
+      <span class="meta-val">Analog · Travel · Lifestyle</span>
+    </div>
+    <div class="meta-row">
+      <span class="meta-label">Contact</span>
+      <span class="meta-val">hello@yourname.com</span>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <span>© 2026 Your Name</span>
+  <div class="soc">
+    <a href="#">Instagram</a>
+    <a href="#">Pinterest</a>
+    <a href="#">Behance</a>
+  </div>
+</footer>
+
+<div class="lb" id="lb" onclick="lbClose(event)">
+  <div class="lb-close" onclick="lbClose(null,true)">✕</div>
+  <div class="lb-frame" id="lb-frame">
+    <img id="lb-img" src="" alt="" />
+  </div>
+</div>
+
+<script>
+/*
+  Замени src на пути к своим фото: 'images/photo1.jpg'
+  w / h — размер карточки в пикселях
+  rot   — угол наклона в градусах
+*/
+const photos = [
+  { src:'https://picsum.photos/seed/fm01/460/580', w:215, h:268, rot:-3.2 },
+  { src:'https://picsum.photos/seed/fm02/600/420', w:308, h:210, rot: 1.8 },
+  { src:'https://picsum.photos/seed/fm03/420/420', w:208, h:208, rot: 2.6 },
+  { src:'https://picsum.photos/seed/fm04/500/340', w:282, h:192, rot:-1.4 },
+  { src:'https://picsum.photos/seed/fm05/380/500', w:192, h:252, rot: 3.8 },
+  { src:'https://picsum.photos/seed/fm06/560/380', w:312, h:212, rot:-2.2 },
+  { src:'https://picsum.photos/seed/fm07/440/580', w:202, h:265, rot: 1.1 },
+  { src:'https://picsum.photos/seed/fm08/500/340', w:262, h:178, rot:-3.6 },
+  { src:'https://picsum.photos/seed/fm09/400/400', w:212, h:212, rot: 2.9 },
+  { src:'https://picsum.photos/seed/fm10/580/400', w:292, h:198, rot:-1.7 },
+  { src:'https://picsum.photos/seed/fm11/420/540', w:196, h:250, rot: 3.2 },
+  { src:'https://picsum.photos/seed/fm12/520/360', w:275, h:186, rot:-2.8 },
+];
+
+(function layout() {
+  const section = document.getElementById('scatter');
+  const W    = Math.min(window.innerWidth, 1280);
+  const PAD  = 44;
+  const ROWS = 3;
+  const perRow = Math.ceil(photos.length / ROWS);
+  const bandH  = Math.max(...photos.map(p => p.h)) + 88;
+  section.style.height = (bandH * ROWS + 40) + 'px';
+
+  const shuffled = [...photos].sort(() => Math.random() - .5);
+  const placed   = [];
+
+  function overlaps(nx, ny, nw, nh) {
+    for (const r of placed)
+      if (nx < r.x+r.w+14 && nx+nw+14 > r.x && ny < r.y+r.h+14 && ny+nh+14 > r.y) return true;
+    return false;
+  }
+
+  shuffled.forEach((p, i) => {
+    const row   = i % ROWS;
+    const col   = (i / ROWS) | 0;
+    const slotW = (W - PAD * 2) / perRow;
+    const bx    = PAD + col * slotW + (slotW - p.w) / 2;
+    const by    = row * bandH + 40 + (bandH - p.h) / 2;
+
+    let x = Math.max(PAD, Math.min(W - p.w - PAD, bx + (Math.random()-.5) * slotW * .5));
+    let y = Math.max(16,  by + (Math.random()-.5) * 62);
+
+    let t = 0;
+    while (overlaps(x, y, p.w, p.h) && t++ < 10) {
+      x = Math.max(PAD, Math.min(W - p.w - PAD, bx + (Math.random()-.5) * slotW * .68));
+      y = Math.max(16,  by + (Math.random()-.5) * 76);
+    }
+    placed.push({ x, y, w: p.w, h: p.h });
+
+    const pin = document.createElement('div');
+    pin.className = 'pin';
+    pin.style.cssText = `left:${x}px;top:${y}px;width:${p.w}px;z-index:${10+i};`;
+    pin.style.setProperty('--rot', `rotate(${p.rot}deg)`);
+
+    const img = document.createElement('img');
+    img.src = p.src; img.alt = 'photo'; img.loading = 'lazy';
+    img.width = p.w; img.height = p.h;
+    pin.appendChild(img);
+    section.appendChild(pin);
+
+    pin.style.opacity = '0';
+    setTimeout(() => {
+      pin.style.transform = `rotate(${p.rot}deg)`;
+      pin.style.animation = `pinIn .7s ${.1 + i*.05}s cubic-bezier(.22,1,.36,1) both`;
+    }, 10);
+
+    pin.addEventListener('mouseenter', () => {
+      pin.style.transform  = `rotate(${p.rot*.2}deg) scale(1.05) translateY(-8px)`;
+      pin.style.zIndex     = '100';
+      pin.style.transition = 'transform .32s cubic-bezier(.22,1,.36,1)';
+    });
+    pin.addEventListener('mouseleave', () => {
+      pin.style.transform  = `rotate(${p.rot}deg)`;
+      pin.style.zIndex     = String(10 + i);
+      pin.style.transition = 'transform .44s cubic-bezier(.22,1,.36,1)';
+    });
+
+    pin.addEventListener('click', () => {
+      document.getElementById('lb-img').src = p.src;
+      document.getElementById('lb').classList.add('on');
+      document.body.style.overflow = 'hidden';
+    });
+  });
+})();
+
+function lbClose(e, force) {
+  if (force || (e && e.target.id === 'lb')) {
+    document.getElementById('lb').classList.remove('on');
+    document.body.style.overflow = '';
+    setTimeout(() => { document.getElementById('lb-img').src = ''; }, 300);
+  }
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') lbClose(null, true); });
+</script>
+</body>
+</html>
