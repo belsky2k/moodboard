@@ -3,34 +3,44 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Moodboard</title>
+<title>—</title>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 html, body {
   width: 100%; height: 100%;
-  background: #F9F5F0;
+  background: #0E0D0C;
   overflow: hidden;
-  font-family: sans-serif;
+  cursor: none;
 }
 
-/* ── GRID ── */
+/* custom cursor */
+.cursor {
+  position: fixed; z-index: 9999; pointer-events: none;
+  width: 12px; height: 12px;
+  border: 1.5px solid #E8E0D4;
+  transform: translate(-50%, -50%);
+  transition: width .12s, height .12s, opacity .12s;
+  mix-blend-mode: difference;
+}
+.cursor.big {
+  width: 60px; height: 60px;
+  border-color: #ff3c00;
+}
+
+/* grid */
 .grid {
   position: fixed; inset: 0;
   display: grid;
-  gap: 16px;
-  padding: 16px;
-  /* columns/rows set by JS */
+  /* columns set by JS */
 }
 
-/* ── CARD ── */
+/* card */
 .card {
   position: relative;
   overflow: hidden;
-  cursor: zoom-in;
+  cursor: none;
   will-change: transform;
-  transition: box-shadow .3s ease;
-  /* transform set by JS each frame */
 }
 
 .card img {
@@ -39,59 +49,114 @@ html, body {
   object-fit: cover;
   pointer-events: none;
   user-select: none;
-  /* placeholder bg until loaded */
-  background: #EDE8E2;
+  filter: contrast(1.04) saturate(0.88);
+  transition: filter .2s;
 }
 
-/* ── LIGHTBOX ── */
+/* random initial rotation set inline by JS */
+/* glitch flash on hover handled by JS class */
+.card.glitch img {
+  filter: contrast(1.3) saturate(0) brightness(1.4);
+}
+
+/* scan-line overlay */
+body::before {
+  content: '';
+  position: fixed; inset: 0; z-index: 800; pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0,0,0,.18) 2px,
+    rgba(0,0,0,.18) 4px
+  );
+}
+
+/* grain */
+body::after {
+  content: '';
+  position: fixed; inset: 0; z-index: 801; pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='.07'/%3E%3C/svg%3E");
+  animation: grainShift 0.08s steps(1) infinite;
+  opacity: .7;
+}
+@keyframes grainShift {
+  0%  { transform: translate(0,0); }
+  25% { transform: translate(-2px,1px); }
+  50% { transform: translate(1px,-1px); }
+  75% { transform: translate(-1px,2px); }
+}
+
+/* gaps between cards — thin dark lines */
+.grid { gap: 2px; background: #0E0D0C; }
+
+/* lightbox */
 .lb {
-  display: none; position: fixed; inset: 0; z-index: 500;
-  background: rgba(249,245,240,.93);
-  backdrop-filter: blur(22px);
-  align-items: center; justify-content: center; cursor: zoom-out;
+  display: none; position: fixed; inset: 0; z-index: 900;
+  background: rgba(14,13,12,.95);
+  align-items: center; justify-content: center; cursor: none;
 }
 .lb.on { display: flex; }
 .lb-frame {
   max-width: 88vw; max-height: 88vh;
-  animation: lbIn .34s cubic-bezier(.22,1,.36,1) both;
-  cursor: default;
+  animation: lbIn .28s cubic-bezier(.22,1,.36,1) both;
+  position: relative;
 }
 .lb-frame img {
   display: block; max-width: 88vw; max-height: 88vh;
   object-fit: contain;
-  box-shadow: 0 20px 80px rgba(50,35,20,.18);
+  filter: contrast(1.06) saturate(0.85);
+}
+/* red corner accent */
+.lb-frame::before {
+  content: '';
+  position: absolute; top: -4px; left: -4px;
+  width: 24px; height: 24px;
+  border-top: 2px solid #ff3c00;
+  border-left: 2px solid #ff3c00;
+}
+.lb-frame::after {
+  content: '';
+  position: absolute; bottom: -4px; right: -4px;
+  width: 24px; height: 24px;
+  border-bottom: 2px solid #ff3c00;
+  border-right: 2px solid #ff3c00;
 }
 .lb-close {
-  position: fixed; top: 1.6rem; right: 1.8rem;
-  width: 36px; height: 36px; border-radius: 50%;
-  border: .5px solid rgba(44,35,28,.15);
-  background: #fff; color: #B3A89F;
-  display: flex; align-items: center; justify-content: center;
-  cursor: pointer; font-size: 16px; transition: all .22s; z-index: 501;
+  position: fixed; top: 1.4rem; right: 1.6rem;
+  font-family: monospace; font-size: .75rem;
+  letter-spacing: .12em; text-transform: uppercase;
+  color: #555; cursor: none;
+  border: none; background: none;
+  transition: color .18s;
+  z-index: 901;
 }
-.lb-close:hover { background: #28231F; color: #fff; }
+.lb-close:hover { color: #ff3c00; }
 
 @keyframes lbIn {
-  from { opacity:0; transform: scale(.92); }
-  to   { opacity:1; transform: scale(1); }
+  from { opacity:0; transform: scale(.96) skewX(-1deg); }
+  to   { opacity:1; transform: scale(1) skewX(0); }
 }
-@keyframes fadeIn {
-  from { opacity:0; }
-  to   { opacity:1; }
+
+/* entry animation */
+@keyframes cardIn {
+  from { opacity: 0; transform: var(--init-rot) scale(.88); }
+  to   { opacity: 1; transform: var(--init-rot) scale(1); }
 }
 </style>
 </head>
 <body>
 
+<div class="cursor" id="cursor"></div>
 <div class="grid" id="grid"></div>
 
-<div class="lb" id="lb" onclick="lbClose(event)">
-  <div class="lb-close" onclick="lbClose(null,true)">✕</div>
+<div class="lb" id="lb">
+  <button class="lb-close" id="lb-close">[ close ]</button>
   <div class="lb-frame"><img id="lb-img" src="" alt="" /></div>
 </div>
 
 <script>
-var ALL_PHOTOS = [
+var ALL = [
   "0420454b-2266-4d9c-a740-ec771158fe05.jpg",
   "05e64f41-a19d-493c-9459-0d3eea69f009.jpg",
   "05f7bf95-8ae3-4127-a1ec-c3f7db7af67b.jpg",
@@ -162,144 +227,151 @@ var ALL_PHOTOS = [
   "outfit inspo.jpg",
 ];
 
-function shuffle(arr) { return arr.slice().sort(function(){ return Math.random()-.5; }); }
+function shuffle(a){ return a.slice().sort(function(){return Math.random()-.5;}); }
+function rnd(a,b){ return a + Math.random()*(b-a); }
 
-/* ── Build grid ── */
-var COLS = window.innerWidth < 700 ? 3 : (window.innerWidth < 1100 ? 5 : 7);
-var ROWS = Math.ceil(68 / COLS); // enough to fill
+/* ── grid setup ── */
+var COLS = window.innerWidth < 700 ? 3 : window.innerWidth < 1100 ? 5 : 7;
+var ROWS = Math.ceil(70 / COLS);
 var COUNT = COLS * ROWS;
 
 var grid = document.getElementById('grid');
-grid.style.gridTemplateColumns = 'repeat(' + COLS + ', 1fr)';
-grid.style.gridTemplateRows    = 'repeat(' + ROWS + ', 1fr)';
+grid.style.gridTemplateColumns = 'repeat('+COLS+',1fr)';
+grid.style.gridTemplateRows    = 'repeat('+ROWS+',1fr)';
 
-var photos = shuffle(ALL_PHOTOS);
-while (photos.length < COUNT) photos = photos.concat(shuffle(ALL_PHOTOS));
-photos = photos.slice(0, COUNT);
+var pool = shuffle(ALL);
+while(pool.length < COUNT) pool = pool.concat(shuffle(ALL));
+pool = pool.slice(0, COUNT);
+
+/* each card gets a random base rotation — the punk chaos */
+var ROTS = [-8,-6,-5,-4,-3,-2,-1,0,1,2,3,4,5,6,8];
 
 var cards = [];
 
-photos.forEach(function(file, i) {
+pool.forEach(function(file, i){
+  var rot = ROTS[Math.floor(Math.random()*ROTS.length)];
+
   var card = document.createElement('div');
   card.className = 'card';
+  card.style.setProperty('--init-rot','rotate('+rot+'deg)');
+
+  /* stagger entry */
+  card.style.animation = 'cardIn .5s '+(i*0.012).toFixed(3)+'s cubic-bezier(.22,1,.36,1) both';
 
   var img = document.createElement('img');
   img.src = 'images/' + encodeURIComponent(file);
-  img.loading = i < COLS * 3 ? 'eager' : 'lazy';
-  img.onerror = function() { card.style.opacity = '0'; };
+  img.loading = i < COLS*2 ? 'eager' : 'lazy';
+  img.onerror = function(){ card.style.background='#1a1815'; };
 
   card.appendChild(img);
   grid.appendChild(card);
 
-  /* store state */
   cards.push({
-    el:   card,
-    file: file,
-    /* current interpolated offsets */
-    tx: 0, ty: 0,
-    rx: 0, ry: 0,
-    sc: 1,
-    /* target values */
-    ttx: 0, tty: 0,
-    trx: 0, try_: 0,
-    tsc: 1,
+    el:    card,
+    img:   img,
+    file:  file,
+    baseRot: rot,
+    /* interpolated state */
+    tx:0, ty:0, rz:rot, sc:1,
+    /* targets */
+    ttx:0, tty:0, trz:rot, tsc:1,
   });
 
-  /* click → lightbox */
-  card.addEventListener('click', function() {
-    document.getElementById('lb-img').src = 'images/' + encodeURIComponent(file);
+  /* lightbox open */
+  card.addEventListener('click', function(){
+    document.getElementById('lb-img').src = 'images/'+encodeURIComponent(file);
     document.getElementById('lb').classList.add('on');
-    document.body.style.overflow = 'hidden';
   });
 });
 
-/* ── Mouse tracking ── */
+/* ── cursor ── */
+var cursorEl = document.getElementById('cursor');
 var mx = -9999, my = -9999;
-var REPEL_R  = 220;   /* radius of influence in px */
-var REPEL_F  = 55;    /* max push distance px */
-var TILT_DEG = 14;    /* max tilt degrees */
-var SCALE_UP = 1.07;  /* hover scale */
 
-window.addEventListener('mousemove', function(e) {
+window.addEventListener('mousemove', function(e){
   mx = e.clientX; my = e.clientY;
+  cursorEl.style.left = mx+'px';
+  cursorEl.style.top  = my+'px';
 });
-window.addEventListener('mouseleave', function() {
-  mx = -9999; my = -9999;
-});
+window.addEventListener('mouseleave', function(){ mx=-9999; my=-9999; });
 
-/* ── Animation loop ── */
-var LERP = 0.10; /* smoothing — lower = more lag */
+/* ── physics params ── */
+var REPEL_R  = 240;
+var REPEL_F  = 70;
+var TILT     = 18;
+var LERP     = 0.09;
 
-function lerp(a, b, t) { return a + (b - a) * t; }
+function lerp(a,b,t){ return a+(b-a)*t; }
 
-function tick() {
+/* ── random glitch on cards ── */
+setInterval(function(){
+  if(Math.random() > 0.7) return;
+  var c = cards[Math.floor(Math.random()*cards.length)];
+  c.el.classList.add('glitch');
+  setTimeout(function(){ c.el.classList.remove('glitch'); }, 80 + Math.random()*120);
+}, 400);
+
+/* ── animation loop ── */
+function tick(){
   requestAnimationFrame(tick);
 
-  cards.forEach(function(c) {
+  cards.forEach(function(c){
     var rect = c.el.getBoundingClientRect();
-    var cx = rect.left + rect.width  / 2;
-    var cy = rect.top  + rect.height / 2;
+    var cx = rect.left + rect.width/2;
+    var cy = rect.top  + rect.height/2;
+    var dx = cx - mx, dy = cy - my;
+    var dist = Math.sqrt(dx*dx+dy*dy);
 
-    var dx = cx - mx;
-    var dy = cy - my;
-    var dist = Math.sqrt(dx * dx + dy * dy);
-
-    if (dist < REPEL_R && dist > 0) {
-      var strength = (1 - dist / REPEL_R);
-      var push     = strength * REPEL_F;
-      c.ttx  = (dx / dist) * push;
-      c.tty  = (dy / dist) * push;
-      /* tilt away from cursor */
-      c.trx  = -(dy / dist) * TILT_DEG * strength;
-      c.try_ =  (dx / dist) * TILT_DEG * strength;
-      c.tsc  = 1 + 0.06 * strength;
+    if(dist < REPEL_R && dist > 0){
+      var str  = 1 - dist/REPEL_R;
+      var push = str * REPEL_F;
+      c.ttx  = (dx/dist)*push;
+      c.tty  = (dy/dist)*push;
+      /* chaotic: rotation swings harder */
+      c.trz  = c.baseRot + (dx/dist)*TILT*str*1.4;
+      c.tsc  = 1 + 0.08*str;
+      cursorEl.classList.add('big');
     } else {
       c.ttx = 0; c.tty = 0;
-      c.trx = 0; c.try_ = 0;
-      c.tsc = 1;
+      c.trz = c.baseRot; c.tsc = 1;
+      cursorEl.classList.remove('big');
     }
 
-    /* smooth interpolation */
-    c.tx = lerp(c.tx, c.ttx, LERP);
-    c.ty = lerp(c.ty, c.tty, LERP);
-    c.rx = lerp(c.rx, c.trx, LERP);
-    c.ry = lerp(c.ry, c.try_, LERP);
-    c.sc = lerp(c.sc, c.tsc, LERP);
+    c.tx  = lerp(c.tx,  c.ttx, LERP);
+    c.ty  = lerp(c.ty,  c.tty, LERP);
+    c.rz  = lerp(c.rz,  c.trz, LERP);
+    c.sc  = lerp(c.sc,  c.tsc, LERP);
 
     c.el.style.transform =
-      'translate(' + c.tx.toFixed(2) + 'px,' + c.ty.toFixed(2) + 'px)' +
-      ' perspective(600px)' +
-      ' rotateX(' + c.rx.toFixed(2) + 'deg)' +
-      ' rotateY(' + c.ry.toFixed(2) + 'deg)' +
-      ' scale(' + c.sc.toFixed(4) + ')';
+      'translate('+c.tx.toFixed(1)+'px,'+c.ty.toFixed(1)+'px)'+
+      ' rotate('+c.rz.toFixed(2)+'deg)'+
+      ' scale('+c.sc.toFixed(3)+')';
 
-    /* subtle shadow boost when displaced */
-    var s = Math.sqrt(c.tx*c.tx + c.ty*c.ty);
-    c.el.style.boxShadow = s > 1
-      ? '0 ' + (6 + s * 0.4).toFixed(0) + 'px ' + (20 + s).toFixed(0) + 'px rgba(50,35,20,' + (0.08 + s * 0.002).toFixed(3) + ')'
-      : '';
+    /* z-index: displaced cards come forward */
+    var d = Math.abs(c.tx)+Math.abs(c.ty);
+    c.el.style.zIndex = d > 2 ? 10 : 1;
   });
 }
 tick();
 
-/* touch: simulate mouse at touch point */
-window.addEventListener('touchmove', function(e) {
-  mx = e.touches[0].clientX;
-  my = e.touches[0].clientY;
-}, { passive: true });
-window.addEventListener('touchend', function() { mx = -9999; my = -9999; });
+/* ── touch ── */
+window.addEventListener('touchmove',function(e){
+  mx=e.touches[0].clientX; my=e.touches[0].clientY;
+},{passive:true});
+window.addEventListener('touchend',function(){ mx=-9999; my=-9999; });
 
-/* ── Lightbox ── */
-function lbClose(e, force) {
-  if (force || (e && e.target.id === 'lb')) {
-    document.getElementById('lb').classList.remove('on');
-    document.body.style.overflow = '';
-    setTimeout(function() { document.getElementById('lb-img').src = ''; }, 300);
-  }
-}
-document.addEventListener('keydown', function(e) {
-  if (e.key === 'Escape') lbClose(null, true);
+/* ── lightbox close ── */
+var lb = document.getElementById('lb');
+lb.addEventListener('click',function(e){
+  if(e.target===lb) closeLb();
 });
+document.getElementById('lb-close').addEventListener('click', closeLb);
+document.addEventListener('keydown',function(e){ if(e.key==='Escape') closeLb(); });
+
+function closeLb(){
+  lb.classList.remove('on');
+  setTimeout(function(){ document.getElementById('lb-img').src=''; },300);
+}
 </script>
 </body>
 </html>
