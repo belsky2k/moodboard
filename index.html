@@ -328,11 +328,11 @@ function buildLayout(photos) {
   const section = document.getElementById('scatter');
   section.innerHTML = '';
 
-  const W      = Math.min(window.innerWidth, 1300);
-  const PAD    = 60;   // отступ от краёв — больше воздуха
-  const ROWS   = 4;    // 4 строки × 5 фото = 20
+  const W      = document.documentElement.clientWidth;
+  const PAD    = 72;
+  const ROWS   = 4;
   const perRow = Math.ceil(photos.length / ROWS);
-  const bandH  = Math.max(...photos.map(p => p.h)) + 130; // высокие полосы
+  const bandH  = Math.max(...photos.map(p => p.h)) + 150;
   section.style.height = (bandH * ROWS + 80) + 'px';
 
   const placed = [];
@@ -372,6 +372,7 @@ function buildLayout(photos) {
     img.loading = 'lazy';
     img.width   = p.w;
     img.height  = p.h;
+    img.onerror = () => { pin.style.display = 'none'; };
     pin.appendChild(img);
     section.appendChild(pin);
 
@@ -392,7 +393,8 @@ function buildLayout(photos) {
       pin.style.transition = 'transform .44s cubic-bezier(.22,1,.36,1)';
     });
     pin.addEventListener('click', () => {
-      document.getElementById('lb-img').src = 'images/' + encodeURIComponent(p.file);
+      const src = 'images/' + encodeURIComponent(p.file);
+      document.getElementById('lb-img').src = src;
       document.getElementById('lb').classList.add('on');
       document.body.style.overflow = 'hidden';
     });
