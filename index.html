@@ -218,8 +218,8 @@ function shuffle(a){ return a.slice().sort(function(){return Math.random()-.5;})
 function rnd(a,b){ return a + Math.random()*(b-a); }
 
 /* ── grid setup ── */
-var COLS = window.innerWidth < 700 ? 2 : window.innerWidth < 1100 ? 3 : 5;
-var ROWS = Math.ceil(70 / COLS);
+var COLS = window.innerWidth < 700 ? 3 : window.innerWidth < 1100 ? 5 : 7;
+var ROWS = Math.ceil(36 / COLS);
 var COUNT = COLS * ROWS;
 
 var grid = document.getElementById('grid');
