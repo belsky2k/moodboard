@@ -315,23 +315,12 @@ const ALL_PHOTOS = [
   { file:"outfit inspo.jpg", w:195, h:250 },
 ];
 
-/* ─── preload ─── */
-function preload(photos) {
-  return Promise.all(photos.map(p => new Promise(resolve => {
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload  = () => resolve({ ...p, img });
-    img.onerror = () => resolve(null);
-    img.src = 'images/' + encodeURIComponent(p.file);
-  }))).then(r => r.filter(Boolean));
-}
-
 function pickRandom(arr, n) {
   return [...arr].sort(() => Math.random() - .5).slice(0, n);
 }
 
 /* ─── Three.js sphere ─── */
-window.addEventListener('load', () => {
+document.addEventListener('DOMContentLoaded', () => {
   const stage = document.getElementById('stage');
   const W = stage.clientWidth;
   const H = stage.clientHeight;
@@ -399,16 +388,25 @@ window.addEventListener('load', () => {
       const pw    = p.w * scale;
       const ph    = p.h * scale;
 
-      const texture = loader.load('images/' + encodeURIComponent(p.file));
-      texture.minFilter = THREE.LinearFilter;
-
       const geo = new THREE.PlaneGeometry(pw, ph);
       const mat = new THREE.MeshLambertMaterial({
-        map:          texture,
-        side:         THREE.FrontSide,
-        transparent:  false,
+        side: THREE.FrontSide,
+        transparent: false,
       });
       const mesh = new THREE.Mesh(geo, mat);
+
+      loader.load(
+        'images/' + encodeURIComponent(p.file),
+        tex => {
+          tex.minFilter = THREE.LinearFilter;
+          mat.map = tex;
+          mat.needsUpdate = true;
+          mesh.visible = true;
+        },
+        undefined,
+        () => { mesh.visible = false; }
+      );
+      mesh.visible = false; /* hidden until texture loads */
 
       const pos = positions[i];
       mesh.position.copy(pos);
@@ -429,13 +427,12 @@ window.addEventListener('load', () => {
     });
   }
 
-  /* ─── Load & build ─── */
-  preload(pickRandom(ALL_PHOTOS, 36)).then(good => {
-    const loading = document.getElementById('loading');
-    loading.classList.add('hidden');
-    setTimeout(() => { loading.style.display = 'none'; }, 700);
-    buildSphere(good.slice(0, 32));
-  });
+  /* ─── Build immediately ─── */
+  const loading = document.getElementById('loading');
+  const selection = pickRandom(ALL_PHOTOS, 32);
+  buildSphere(selection);
+  loading.classList.add('hidden');
+  setTimeout(() => { loading.style.display = 'none'; }, 400);
 
   /* ─── Drag rotation ─── */
   let isDragging  = false;
