@@ -13,7 +13,7 @@
   --ink:    #28231F;
   --dust:   #B3A89F;
   --white:  #FFFFFF;
-  --shadow: rgba(60,40,20,.13);
+  --shadow: rgba(60,40,20,.12);
 }
 html { scroll-behavior: smooth; }
 body {
@@ -59,14 +59,34 @@ nav a {
 }
 nav a:hover { color: var(--ink); }
 
+/* SHUFFLE HINT */
+.shuffle-hint {
+  position: relative; z-index: 10;
+  text-align: center;
+  margin-top: -.5rem;
+  font-size: .7rem; letter-spacing: .16em; text-transform: uppercase;
+  color: var(--dust); opacity: .7;
+  animation: riseUp .8s .2s cubic-bezier(.22,1,.36,1) both;
+}
+.shuffle-btn {
+  display: inline-block; margin-top: .5rem;
+  font-size: .68rem; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--dust); background: none; border: none;
+  border-bottom: .5px solid var(--dust);
+  cursor: pointer; padding-bottom: 1px;
+  transition: color .25s, border-color .25s;
+  font-family: 'DM Sans', sans-serif; font-weight: 300;
+}
+.shuffle-btn:hover { color: var(--ink); border-color: var(--ink); }
+
 /* SCATTER */
-.scatter { position: relative; width: 100%; margin-top: 1rem; }
+.scatter { position: relative; width: 100%; margin-top: 2.5rem; }
 .pin {
   position: absolute; cursor: zoom-in; will-change: transform;
 }
 .pin img {
   display: block; object-fit: cover;
-  box-shadow: 0 6px 30px var(--shadow);
+  box-shadow: 0 8px 36px var(--shadow);
   pointer-events: none; user-select: none;
 }
 
@@ -74,7 +94,7 @@ nav a:hover { color: var(--ink); }
 .about {
   position: relative; z-index: 10;
   max-width: 860px; margin: 0 auto;
-  padding: 6rem 3rem 3rem;
+  padding: 7rem 3rem 3rem;
   display: grid; grid-template-columns: 1.2fr 1fr;
   gap: 5rem; align-items: end;
 }
@@ -112,8 +132,8 @@ footer span { font-size: .75rem; color: var(--dust); }
 /* LIGHTBOX */
 .lb {
   display: none; position: fixed; inset: 0; z-index: 500;
-  background: rgba(249,245,240,.9);
-  backdrop-filter: blur(18px);
+  background: rgba(249,245,240,.92);
+  backdrop-filter: blur(20px);
   align-items: center; justify-content: center; cursor: zoom-out;
 }
 .lb.on { display: flex; }
@@ -124,7 +144,7 @@ footer span { font-size: .75rem; color: var(--dust); }
 }
 .lb-frame img {
   display: block; max-width: 88vw; max-height: 85vh;
-  object-fit: contain; box-shadow: 0 16px 64px rgba(60,40,20,.2);
+  object-fit: contain; box-shadow: 0 20px 70px rgba(60,40,20,.18);
 }
 .lb-close {
   position: fixed; top: 1.6rem; right: 1.8rem;
@@ -145,8 +165,12 @@ footer span { font-size: .75rem; color: var(--dust); }
   to   { opacity:1; transform: scale(1); }
 }
 @keyframes pinIn {
-  from { opacity:0; transform: var(--rot) translateY(18px) scale(.94); }
+  from { opacity:0; transform: var(--rot) translateY(22px) scale(.93); }
   to   { opacity:1; transform: var(--rot) translateY(0) scale(1); }
+}
+@keyframes pinOut {
+  from { opacity:1; transform: var(--rot) scale(1); }
+  to   { opacity:0; transform: var(--rot) translateY(-16px) scale(.94); }
 }
 
 @media (max-width: 700px) {
@@ -169,6 +193,12 @@ footer span { font-size: .75rem; color: var(--dust); }
     </nav>
   </div>
 </header>
+
+<div class="shuffle-hint">
+  каждый раз новая подборка
+  <br>
+  <button class="shuffle-btn" onclick="reshuffle()">перемешать →</button>
+</div>
 
 <section class="scatter" id="scatter"></section>
 
@@ -209,8 +239,8 @@ footer span { font-size: .75rem; color: var(--dust); }
 </div>
 
 <script>
-/* ─── все 74 фотографии из папки images/ ─── */
-const photos = [
+/* ─── все 74 фото ─── */
+const ALL_PHOTOS = [
   { file:"0420454b-2266-4d9c-a740-ec771158fe05.jpg", w:210, h:265, rot:-3.2 },
   { file:"05e64f41-a19d-493c-9459-0d3eea69f009.jpg", w:290, h:195, rot:1.8 },
   { file:"05f7bf95-8ae3-4127-a1ec-c3f7db7af67b.jpg", w:215, h:215, rot:2.6 },
@@ -288,39 +318,46 @@ const photos = [
   { file:"⚫️ _ Vintage Japanese Brand KADOYA Bikers Leather….jpg", w:275, h:185, rot:2.1 },
 ];
 
-/* ─── layout ─── */
-(function layout() {
-  const section = document.getElementById('scatter');
-  const W    = Math.min(window.innerWidth, 1280);
-  const PAD  = 44;
-  const ROWS = 7;
-  const perRow = Math.ceil(photos.length / ROWS);
-  const bandH  = Math.max(...photos.map(p => p.h)) + 80;
-  section.style.height = (bandH * ROWS + 60) + 'px';
+const SHOW = 20; // сколько фото показывать за раз
 
-  const shuffled = [...photos].sort(() => Math.random() - .5);
-  const placed   = [];
+function pickRandom(arr, n) {
+  return [...arr].sort(() => Math.random() - .5).slice(0, n);
+}
+
+function buildLayout(photos) {
+  const section = document.getElementById('scatter');
+  section.innerHTML = '';
+
+  const W      = Math.min(window.innerWidth, 1300);
+  const PAD    = 60;   // отступ от краёв — больше воздуха
+  const ROWS   = 4;    // 4 строки × 5 фото = 20
+  const perRow = Math.ceil(photos.length / ROWS);
+  const bandH  = Math.max(...photos.map(p => p.h)) + 130; // высокие полосы
+  section.style.height = (bandH * ROWS + 80) + 'px';
+
+  const placed = [];
 
   function overlaps(nx, ny, nw, nh) {
+    const M = 40; // минимальный зазор между фото
     for (const r of placed)
-      if (nx < r.x+r.w+12 && nx+nw+12 > r.x && ny < r.y+r.h+12 && ny+nh+12 > r.y) return true;
+      if (nx < r.x+r.w+M && nx+nw+M > r.x && ny < r.y+r.h+M && ny+nh+M > r.y) return true;
     return false;
   }
 
-  shuffled.forEach((p, i) => {
+  photos.forEach((p, i) => {
     const row   = i % ROWS;
     const col   = (i / ROWS) | 0;
     const slotW = (W - PAD * 2) / perRow;
     const bx    = PAD + col * slotW + (slotW - p.w) / 2;
-    const by    = row * bandH + 36 + (bandH - p.h) / 2;
+    const by    = row * bandH + 50 + (bandH - p.h) / 2;
 
-    let x = Math.max(PAD, Math.min(W - p.w - PAD, bx + (Math.random()-.5) * slotW * .5));
-    let y = Math.max(16,  by + (Math.random()-.5) * 60);
+    let x = Math.max(PAD, Math.min(W - p.w - PAD, bx + (Math.random()-.5) * slotW * .42));
+    let y = Math.max(24,  by + (Math.random()-.5) * 70);
 
     let t = 0;
-    while (overlaps(x, y, p.w, p.h) && t++ < 10) {
-      x = Math.max(PAD, Math.min(W - p.w - PAD, bx + (Math.random()-.5) * slotW * .65));
-      y = Math.max(16,  by + (Math.random()-.5) * 72);
+    while (overlaps(x, y, p.w, p.h) && t++ < 12) {
+      x = Math.max(PAD, Math.min(W - p.w - PAD, bx + (Math.random()-.5) * slotW * .55));
+      y = Math.max(24,  by + (Math.random()-.5) * 80);
     }
     placed.push({ x, y, w: p.w, h: p.h });
 
@@ -330,7 +367,6 @@ const photos = [
     pin.style.setProperty('--rot', `rotate(${p.rot}deg)`);
 
     const img = document.createElement('img');
-    /* encodeURIComponent handles spaces, emoji, parens, dashes in filenames */
     img.src     = 'images/' + encodeURIComponent(p.file);
     img.alt     = 'photo';
     img.loading = 'lazy';
@@ -342,11 +378,11 @@ const photos = [
     pin.style.opacity = '0';
     setTimeout(() => {
       pin.style.transform = `rotate(${p.rot}deg)`;
-      pin.style.animation = `pinIn .7s ${.08 + i*.03}s cubic-bezier(.22,1,.36,1) both`;
+      pin.style.animation = `pinIn .75s ${.06 + i*.06}s cubic-bezier(.22,1,.36,1) both`;
     }, 10);
 
     pin.addEventListener('mouseenter', () => {
-      pin.style.transform  = `rotate(${p.rot*.2}deg) scale(1.05) translateY(-8px)`;
+      pin.style.transform  = `rotate(${p.rot*.2}deg) scale(1.05) translateY(-10px)`;
       pin.style.zIndex     = '100';
       pin.style.transition = 'transform .32s cubic-bezier(.22,1,.36,1)';
     });
@@ -361,7 +397,21 @@ const photos = [
       document.body.style.overflow = 'hidden';
     });
   });
-})();
+}
+
+function reshuffle() {
+  const section = document.getElementById('scatter');
+  // плавно убираем старые
+  [...section.querySelectorAll('.pin')].forEach((pin, i) => {
+    pin.style.transition = `opacity .3s ${i*.02}s, transform .3s ${i*.02}s`;
+    pin.style.opacity    = '0';
+    pin.style.transform  = (pin.style.transform || '') + ' translateY(-14px) scale(.95)';
+  });
+  setTimeout(() => buildLayout(pickRandom(ALL_PHOTOS, SHOW)), 380);
+}
+
+// первый показ
+buildLayout(pickRandom(ALL_PHOTOS, SHOW));
 
 function lbClose(e, force) {
   if (force || (e && e.target.id === 'lb')) {
