@@ -137,6 +137,12 @@ body::after {
   from { opacity: 0; transform: var(--init-rot) scale(.88); }
   to   { opacity: 1; transform: var(--init-rot) scale(1); }
 }
+@media (hover: none) {
+  .cursor { display: none; }
+  html, body { cursor: auto; }
+  .card { cursor: pointer; }
+  .lb { cursor: auto; }
+}
 </style>
 </head>
 <body>
