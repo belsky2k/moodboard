@@ -318,27 +318,36 @@ const ALL_PHOTOS = [
   { file:"⚫️ _ Vintage Japanese Brand KADOYA Bikers Leather….jpg", w:275, h:185, rot:2.1 },
 ];
 
-const SHOW = 20; // сколько фото показывать за раз
+const SHOW = 20;
 
 function pickRandom(arr, n) {
   return [...arr].sort(() => Math.random() - .5).slice(0, n);
+}
+
+/* Проверяем фото заранее — убираем битые до раскладки */
+function preload(photos) {
+  return Promise.all(photos.map(p => new Promise(resolve => {
+    const img = new Image();
+    img.onload  = () => resolve(p);
+    img.onerror = () => resolve(null);
+    img.src = 'images/' + encodeURIComponent(p.file);
+  }))).then(results => results.filter(Boolean));
 }
 
 function buildLayout(photos) {
   const section = document.getElementById('scatter');
   section.innerHTML = '';
 
-  const W      = document.documentElement.clientWidth;
-  const PAD    = 72;
-  const ROWS   = 4;
+  const W    = section.getBoundingClientRect().width || window.innerWidth;
+  const PAD  = 70;
+  const ROWS = 4;
   const perRow = Math.ceil(photos.length / ROWS);
   const bandH  = Math.max(...photos.map(p => p.h)) + 150;
   section.style.height = (bandH * ROWS + 80) + 'px';
 
   const placed = [];
-
   function overlaps(nx, ny, nw, nh) {
-    const M = 40; // минимальный зазор между фото
+    const M = 44;
     for (const r of placed)
       if (nx < r.x+r.w+M && nx+nw+M > r.x && ny < r.y+r.h+M && ny+nh+M > r.y) return true;
     return false;
@@ -351,9 +360,8 @@ function buildLayout(photos) {
     const bx    = PAD + col * slotW + (slotW - p.w) / 2;
     const by    = row * bandH + 50 + (bandH - p.h) / 2;
 
-    let x = Math.max(PAD, Math.min(W - p.w - PAD, bx + (Math.random()-.5) * slotW * .42));
+    let x = Math.max(PAD, Math.min(W - p.w - PAD, bx + (Math.random()-.5) * slotW * .4));
     let y = Math.max(24,  by + (Math.random()-.5) * 70);
-
     let t = 0;
     while (overlaps(x, y, p.w, p.h) && t++ < 12) {
       x = Math.max(PAD, Math.min(W - p.w - PAD, bx + (Math.random()-.5) * slotW * .55));
@@ -363,38 +371,35 @@ function buildLayout(photos) {
 
     const pin = document.createElement('div');
     pin.className = 'pin';
-    pin.style.cssText = `left:${x}px;top:${y}px;width:${p.w}px;z-index:${10+i};`;
-    pin.style.setProperty('--rot', `rotate(${p.rot}deg)`);
+    pin.style.cssText = 'left:'+x+'px;top:'+y+'px;width:'+p.w+'px;z-index:'+(10+i)+';';
+    pin.style.setProperty('--rot', 'rotate('+p.rot+'deg)');
 
     const img = document.createElement('img');
-    img.src     = 'images/' + encodeURIComponent(p.file);
-    img.alt     = 'photo';
-    img.loading = 'lazy';
-    img.width   = p.w;
-    img.height  = p.h;
-    img.onerror = () => { pin.style.display = 'none'; };
+    img.src    = 'images/' + encodeURIComponent(p.file);
+    img.alt    = 'photo';
+    img.width  = p.w;
+    img.height = p.h;
     pin.appendChild(img);
     section.appendChild(pin);
 
     pin.style.opacity = '0';
     setTimeout(() => {
-      pin.style.transform = `rotate(${p.rot}deg)`;
-      pin.style.animation = `pinIn .75s ${.06 + i*.06}s cubic-bezier(.22,1,.36,1) both`;
+      pin.style.transform = 'rotate('+p.rot+'deg)';
+      pin.style.animation = 'pinIn .75s '+(.06 + i*.06)+'s cubic-bezier(.22,1,.36,1) both';
     }, 10);
 
     pin.addEventListener('mouseenter', () => {
-      pin.style.transform  = `rotate(${p.rot*.2}deg) scale(1.05) translateY(-10px)`;
+      pin.style.transform  = 'rotate('+(p.rot*.2)+'deg) scale(1.05) translateY(-10px)';
       pin.style.zIndex     = '100';
       pin.style.transition = 'transform .32s cubic-bezier(.22,1,.36,1)';
     });
     pin.addEventListener('mouseleave', () => {
-      pin.style.transform  = `rotate(${p.rot}deg)`;
+      pin.style.transform  = 'rotate('+p.rot+'deg)';
       pin.style.zIndex     = String(10 + i);
       pin.style.transition = 'transform .44s cubic-bezier(.22,1,.36,1)';
     });
     pin.addEventListener('click', () => {
-      const src = 'images/' + encodeURIComponent(p.file);
-      document.getElementById('lb-img').src = src;
+      document.getElementById('lb-img').src = 'images/' + encodeURIComponent(p.file);
       document.getElementById('lb').classList.add('on');
       document.body.style.overflow = 'hidden';
     });
@@ -403,25 +408,25 @@ function buildLayout(photos) {
 
 function reshuffle() {
   const section = document.getElementById('scatter');
-  // плавно убираем старые
   [...section.querySelectorAll('.pin')].forEach((pin, i) => {
-    pin.style.transition = `opacity .3s ${i*.02}s, transform .3s ${i*.02}s`;
+    pin.style.transition = 'opacity .28s '+(i*.018)+'s, transform .28s '+(i*.018)+'s';
     pin.style.opacity    = '0';
     pin.style.transform  = (pin.style.transform || '') + ' translateY(-14px) scale(.95)';
   });
-  setTimeout(() => buildLayout(pickRandom(ALL_PHOTOS, SHOW)), 380);
+  setTimeout(() => {
+    preload(pickRandom(ALL_PHOTOS, SHOW + 6)).then(good => {
+      buildLayout(good.slice(0, SHOW));
+    });
+  }, 350);
 }
 
-// первый показ
-buildLayout(pickRandom(ALL_PHOTOS, SHOW));
+/* window.load — ширина точно известна, шрифты загружены */
+window.addEventListener('load', () => {
+  preload(pickRandom(ALL_PHOTOS, SHOW + 6)).then(good => {
+    buildLayout(good.slice(0, SHOW));
+  });
+});
 
-function lbClose(e, force) {
-  if (force || (e && e.target.id === 'lb')) {
-    document.getElementById('lb').classList.remove('on');
-    document.body.style.overflow = '';
-    setTimeout(() => { document.getElementById('lb-img').src = ''; }, 300);
-  }
-}
 document.addEventListener('keydown', e => { if (e.key === 'Escape') lbClose(null, true); });
 </script>
 </body>
