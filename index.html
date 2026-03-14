@@ -9,11 +9,10 @@
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
-  --bg:     #F9F5F0;
-  --ink:    #28231F;
-  --dust:   #B3A89F;
-  --white:  #FFFFFF;
-  --shadow: rgba(60,40,20,.12);
+  --bg:    #F9F5F0;
+  --ink:   #28231F;
+  --dust:  #B3A89F;
+  --white: #FFFFFF;
 }
 html { scroll-behavior: smooth; }
 body {
@@ -24,9 +23,9 @@ body {
   overflow-x: hidden;
 }
 body::after {
-  content:''; position:fixed; inset:0; pointer-events:none; z-index:999;
-  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='.035'/%3E%3C/svg%3E");
-  opacity:.6;
+  content:''; position:fixed; inset:0; pointer-events:none; z-index:900;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='.04'/%3E%3C/svg%3E");
+  opacity:.5;
 }
 
 /* HEADER */
@@ -59,42 +58,59 @@ nav a {
 }
 nav a:hover { color: var(--ink); }
 
-/* SHUFFLE HINT */
-.shuffle-hint {
-  position: relative; z-index: 10;
-  text-align: center;
-  margin-top: -.5rem;
-  font-size: .7rem; letter-spacing: .16em; text-transform: uppercase;
-  color: var(--dust); opacity: .7;
-  animation: riseUp .8s .2s cubic-bezier(.22,1,.36,1) both;
+/* SPHERE STAGE */
+.stage {
+  position: relative;
+  width: 100%;
+  height: 82vh;
+  cursor: grab;
+  overflow: hidden;
 }
-.shuffle-btn {
-  display: inline-block; margin-top: .5rem;
-  font-size: .68rem; letter-spacing: .14em; text-transform: uppercase;
-  color: var(--dust); background: none; border: none;
-  border-bottom: .5px solid var(--dust);
-  cursor: pointer; padding-bottom: 1px;
-  transition: color .25s, border-color .25s;
-  font-family: 'DM Sans', sans-serif; font-weight: 300;
-}
-.shuffle-btn:hover { color: var(--ink); border-color: var(--ink); }
+.stage:active { cursor: grabbing; }
+.stage canvas { display: block; }
 
-/* SCATTER */
-.scatter { position: relative; width: 100%; margin-top: 2.5rem; }
-.pin {
-  position: absolute; cursor: zoom-in; will-change: transform;
+/* hint */
+.stage-hint {
+  position: absolute; bottom: 2rem; left: 50%;
+  transform: translateX(-50%);
+  font-size: .68rem; letter-spacing: .15em; text-transform: uppercase;
+  color: var(--dust); pointer-events: none;
+  animation: riseUp 1s 1.2s cubic-bezier(.22,1,.36,1) both;
 }
-.pin img {
-  display: block; object-fit: cover;
-  box-shadow: 0 8px 36px var(--shadow);
-  pointer-events: none; user-select: none;
+
+/* loading overlay */
+.loading {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  flex-direction: column; gap: 1rem;
+  pointer-events: none; z-index: 5;
+  transition: opacity .6s;
+}
+.loading.hidden { opacity: 0; }
+.loading-text {
+  font-family: 'Cormorant', serif; font-style: italic;
+  font-size: 1.1rem; color: var(--dust);
+}
+.loading-bar {
+  width: 120px; height: .5px;
+  background: rgba(179,168,159,.2);
+  position: relative; overflow: hidden;
+}
+.loading-bar::after {
+  content:'';
+  position: absolute; inset-block: 0; left: -100%; width: 100%;
+  background: var(--dust);
+  animation: loadBar 1.4s ease infinite;
+}
+@keyframes loadBar {
+  to { left: 100%; }
 }
 
 /* ABOUT */
 .about {
   position: relative; z-index: 10;
   max-width: 860px; margin: 0 auto;
-  padding: 7rem 3rem 3rem;
+  padding: 5rem 3rem 3rem;
   display: grid; grid-template-columns: 1.2fr 1fr;
   gap: 5rem; align-items: end;
 }
@@ -110,14 +126,12 @@ nav a:hover { color: var(--ink); }
   font-size: .68rem; font-weight: 300;
   letter-spacing: .14em; text-transform: uppercase; color: var(--dust);
 }
-.meta-val {
-  font-family: 'Cormorant', serif; font-size: 1.05rem; color: var(--ink);
-}
+.meta-val { font-family: 'Cormorant', serif; font-size: 1.05rem; color: var(--ink); }
 
 /* FOOTER */
 footer {
   position: relative; z-index: 10;
-  padding: 2.2rem 3rem; margin-top: 4rem;
+  padding: 2.2rem 3rem; margin-top: 3rem;
   border-top: .5px solid rgba(44,35,28,.1);
   display: flex; align-items: center; justify-content: space-between;
 }
@@ -132,15 +146,13 @@ footer span { font-size: .75rem; color: var(--dust); }
 /* LIGHTBOX */
 .lb {
   display: none; position: fixed; inset: 0; z-index: 500;
-  background: rgba(249,245,240,.92);
-  backdrop-filter: blur(20px);
+  background: rgba(249,245,240,.92); backdrop-filter: blur(20px);
   align-items: center; justify-content: center; cursor: zoom-out;
 }
 .lb.on { display: flex; }
 .lb-frame {
   max-width: 88vw; max-height: 88vh;
-  animation: lbIn .36s cubic-bezier(.22,1,.36,1) both;
-  cursor: default;
+  animation: lbIn .36s cubic-bezier(.22,1,.36,1) both; cursor: default;
 }
 .lb-frame img {
   display: block; max-width: 88vw; max-height: 85vh;
@@ -164,19 +176,12 @@ footer span { font-size: .75rem; color: var(--dust); }
   from { opacity:0; transform: scale(.92); }
   to   { opacity:1; transform: scale(1); }
 }
-@keyframes pinIn {
-  from { opacity:0; transform: var(--rot) translateY(22px) scale(.93); }
-  to   { opacity:1; transform: var(--rot) translateY(0) scale(1); }
-}
-@keyframes pinOut {
-  from { opacity:1; transform: var(--rot) scale(1); }
-  to   { opacity:0; transform: var(--rot) translateY(-16px) scale(.94); }
-}
 
 @media (max-width: 700px) {
   header { padding: 1.8rem; flex-direction: column; align-items: flex-start; gap: 1rem; }
   .header-right { align-items: flex-start; }
-  .about { grid-template-columns: 1fr; gap: 2.4rem; padding: 4rem 1.8rem 2rem; }
+  .stage { height: 60vh; }
+  .about { grid-template-columns: 1fr; gap: 2.4rem; padding: 3rem 1.8rem 2rem; }
   footer { flex-direction: column; gap: .8rem; text-align: center; }
 }
 </style>
@@ -194,13 +199,13 @@ footer span { font-size: .75rem; color: var(--dust); }
   </div>
 </header>
 
-<div class="shuffle-hint">
-  каждый раз новая подборка
-  <br>
-  <button class="shuffle-btn" onclick="reshuffle()">перемешать →</button>
+<div class="stage" id="stage">
+  <div class="loading" id="loading">
+    <span class="loading-text">loading memories…</span>
+    <div class="loading-bar"></div>
+  </div>
+  <span class="stage-hint">drag to rotate · click to open</span>
 </div>
-
-<section class="scatter" id="scatter"></section>
 
 <section class="about" id="about">
   <p class="about-quote">
@@ -233,200 +238,293 @@ footer span { font-size: .75rem; color: var(--dust); }
 
 <div class="lb" id="lb" onclick="lbClose(event)">
   <div class="lb-close" onclick="lbClose(null,true)">✕</div>
-  <div class="lb-frame" id="lb-frame">
-    <img id="lb-img" src="" alt="" />
-  </div>
+  <div class="lb-frame"><img id="lb-img" src="" alt="" /></div>
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
-/* ─── все 74 фото ─── */
+/* ─── photo catalogue ─── */
 const ALL_PHOTOS = [
-  { file:"0420454b-2266-4d9c-a740-ec771158fe05.jpg", w:210, h:265, rot:-3.2 },
-  { file:"05e64f41-a19d-493c-9459-0d3eea69f009.jpg", w:290, h:195, rot:1.8 },
-  { file:"05f7bf95-8ae3-4127-a1ec-c3f7db7af67b.jpg", w:215, h:215, rot:2.6 },
-  { file:"0d01d997-6a98-4f77-a09d-41c718e79f36.jpg", w:195, h:250, rot:-1.4 },
-  { file:"109c97b8-0b4d-441b-847d-9a77c6da5499.jpg", w:275, h:185, rot:3.8 },
-  { file:"155be252-0b7f-4a1f-9783-5274d514c27a.jpg", w:230, h:290, rot:-2.2 },
-  { file:"15610179-6653-44a7-89a9-662277cfa04a.jpg", w:300, h:200, rot:1.1 },
-  { file:"1f671742-fa61-44c8-8546-da79fa3de72f.jpg", w:200, h:200, rot:-3.6 },
-  { file:"2277713c-e5c1-480d-b094-4d225a4bde8c.jpg", w:185, h:240, rot:2.9 },
-  { file:"2dfb590f-7660-4d6a-b031-6a6c97d24cc5.jpg", w:260, h:175, rot:-1.7 },
-  { file:"3105e2b9-9f42-4a5d-a5ad-333249d4a2be.jpg", w:210, h:265, rot:3.2 },
-  { file:"32f934df-de33-4064-a614-9332bad4a855.jpg", w:290, h:195, rot:-2.8 },
-  { file:"3593790a-5b22-419a-8df0-3ce65acb87ea.jpg", w:215, h:215, rot:1.5 },
-  { file:"36870323-d5f4-4bf1-a00b-ac4d1307890b.jpg", w:195, h:250, rot:-0.9 },
-  { file:"384be059-ad9a-4bd0-ae19-b32271b9b544.jpg", w:275, h:185, rot:2.1 },
-  { file:"3a91836b-3e4e-428d-9574-24aa0e3a36fe.jpg", w:230, h:290, rot:-3.2 },
-  { file:"3f545d01-ff7a-4a64-ae3d-1b039b2f2c03.jpg", w:300, h:200, rot:1.8 },
-  { file:"46230fd3-804f-4c12-ba71-e9225a5acf00.jpg", w:200, h:200, rot:2.6 },
-  { file:"4a967de9-fbc1-4243-930a-90610059c096.jpg", w:185, h:240, rot:-1.4 },
-  { file:"4e74192d-9221-4230-b6e1-a2e8eeea7855.jpg", w:260, h:175, rot:3.8 },
-  { file:"584df2cf-0317-4cd0-ac70-ebaf04da2ad0.jpg", w:210, h:265, rot:-2.2 },
-  { file:"5b88543e-7994-42db-b6ca-2a98f15c194e.jpg", w:290, h:195, rot:1.1 },
-  { file:"5f15f2b2-7a1b-4827-861f-1bbe77cef6a1.jpg", w:215, h:215, rot:-3.6 },
-  { file:"63aa7df5-aa6d-4831-8e57-6ad83b41a474.jpg", w:195, h:250, rot:2.9 },
-  { file:"65f9d442-a8f6-4c50-b384-cbe448e21412.jpg", w:275, h:185, rot:-1.7 },
-  { file:"6_0 CAP CENTER (MATCHA) Traditional hunting cap….jpg", w:230, h:290, rot:3.2 },
-  { file:"6d9ce597-6816-42ab-8d5a-f14e19ebf0ea.jpg", w:300, h:200, rot:-2.8 },
-  { file:"6e87a685-2988-4b34-97a3-b53a264c264c.jpg", w:200, h:200, rot:1.5 },
-  { file:"6f862228-04c2-4972-bf72-3340f94707a2.jpg", w:185, h:240, rot:-0.9 },
-  { file:"6fe56739-3de9-4d64-a776-f901f0acd761.jpg", w:260, h:175, rot:2.1 },
-  { file:"74e06edb-b79c-420e-882f-e965dd4fc7f8.jpg", w:210, h:265, rot:-3.2 },
-  { file:"84356c4e-c79c-4a8c-9709-3de7ba71f25a.jpg", w:290, h:195, rot:1.8 },
-  { file:"853c3517-1932-4080-9161-03c290594afe.jpg", w:215, h:215, rot:2.6 },
-  { file:"8_0 BOMBER RIGHT (OLIVE GREEN) Bomber jacket with….jpg", w:195, h:250, rot:-1.4 },
-  { file:"8d459cb3-8150-41b7-a934-80a589579674.jpg", w:275, h:185, rot:3.8 },
-  { file:"8deb3a8f-c725-4477-812d-c2fd28652be0.jpg", w:230, h:290, rot:-2.2 },
-  { file:"91896d21-671a-44b9-a0a1-50947163217e.jpg", w:300, h:200, rot:1.1 },
-  { file:"989dc66e-69d3-47b4-8780-a4b94a05aa35.jpg", w:200, h:200, rot:-3.6 },
-  { file:"9b7cb063-7abf-4452-b6e0-d41989b1ed46.jpg", w:185, h:240, rot:2.9 },
-  { file:"9b96676e-494d-4b7a-9e7f-744bf4ac38d3.jpg", w:260, h:175, rot:-1.7 },
-  { file:"9c1855e0-7f14-400d-beb7-d8621d48e9ea.jpg", w:210, h:265, rot:3.2 },
-  { file:"9c7c108e-9f7b-4ac6-82a1-58251ce6118b.jpg", w:290, h:195, rot:-2.8 },
-  { file:"Arki Studio _ Simple Shelf _ Miseru Simple Shelf….jpg", w:215, h:215, rot:1.5 },
-  { file:"Boxy Wool Twill Jacket - Black _ Manière De Voir….jpg", w:195, h:250, rot:-0.9 },
-  { file:"Designer fashion, Seoul-fully created _ W Concept.jpg", w:275, h:185, rot:2.1 },
-  { file:"Instagram (1).jpg", w:230, h:290, rot:-3.2 },
-  { file:"MHL_ HIGH COLLAR JACKET DENSE WOOL MELTON NAVY.jpg", w:300, h:200, rot:1.8 },
-  { file:"Masion Martin Margiela.jpg", w:200, h:200, rot:2.6 },
-  { file:"Men_s Autumn _24– Studio Nicholson.jpg", w:185, h:240, rot:-1.4 },
-  { file:"P O P H A M S (@pophamsbakery) • Instagram photos….jpg", w:260, h:175, rot:3.8 },
-  { file:"Reverted this back to being a reading corner 🎞️☕️….jpg", w:210, h:265, rot:-2.2 },
-  { file:"Saharat Detuppkarn (@thewtypo) • Photos et vidéos….jpg", w:290, h:195, rot:1.1 },
-  { file:"The sneaker loafer takeover continues 💪🏼….jpg", w:215, h:215, rot:-3.6 },
-  { file:"a6695a37-0137-44b3-96a4-33c6a4bea77d.jpg", w:195, h:250, rot:2.9 },
-  { file:"b1e15bbe-0734-42bf-9c44-ba402939efee.jpg", w:275, h:185, rot:-1.7 },
-  { file:"b6671bf3-2d64-4ff1-9278-489be035a612.jpg", w:230, h:290, rot:3.2 },
-  { file:"b8048d62-54d5-4df2-ae15-4f454dc1777a.jpg", w:300, h:200, rot:-2.8 },
-  { file:"c0d48d92-8677-4a52-bb58-377ce0834b1c.jpg", w:200, h:200, rot:1.5 },
-  { file:"cb322a35-3056-4a42-bb79-bfd643f9205c.jpg", w:185, h:240, rot:-0.9 },
-  { file:"ceaab978-e8a7-45c9-aadc-488b27659aca.jpg", w:260, h:175, rot:2.1 },
-  { file:"d54b465e-155f-4835-9360-6ca7172f45ce.jpg", w:210, h:265, rot:-3.2 },
-  { file:"d90f96c7-991a-40bf-a1cf-226d9116571c.jpg", w:290, h:195, rot:1.8 },
-  { file:"dab6c5c9-456d-4cee-9848-e219e73c6a3d.jpg", w:215, h:215, rot:2.6 },
-  { file:"dddd7868-965e-4884-b887-bb9364bc726b.jpg", w:195, h:250, rot:-1.4 },
-  { file:"de0d96ca-0977-407e-b833-b3905bd0a708.jpg", w:275, h:185, rot:3.8 },
-  { file:"e4ae7853-0eb9-4b09-8dcc-41772af7205f.jpg", w:230, h:290, rot:-2.2 },
-  { file:"e628fe76-b5fc-4248-a219-dd17c7ed5367.jpg", w:300, h:200, rot:1.1 },
-  { file:"e7601664-8aa7-4d8b-890d-3fdf63d2f02c.jpg", w:200, h:200, rot:-3.6 },
-  { file:"ebb8be57-a9f5-40b6-947e-7850a1e71b35.jpg", w:185, h:240, rot:2.9 },
-  { file:"f308a086-1378-444c-8a25-11ff423452d9.jpg", w:260, h:175, rot:-1.7 },
-  { file:"f7da3328-8423-4860-9877-f67c5b414bae.jpg", w:210, h:265, rot:3.2 },
-  { file:"f9654229-745c-4cac-b598-22f358b58661.jpg", w:290, h:195, rot:-2.8 },
-  { file:"osteria.jpg", w:215, h:215, rot:1.5 },
-  { file:"outfit inspo.jpg", w:195, h:250, rot:-0.9 },
-  { file:"⚫️ _ Vintage Japanese Brand KADOYA Bikers Leather….jpg", w:275, h:185, rot:2.1 },
+  { file:"0420454b-2266-4d9c-a740-ec771158fe05.jpg", w:210, h:265 },
+  { file:"05e64f41-a19d-493c-9459-0d3eea69f009.jpg", w:290, h:195 },
+  { file:"05f7bf95-8ae3-4127-a1ec-c3f7db7af67b.jpg", w:215, h:215 },
+  { file:"0d01d997-6a98-4f77-a09d-41c718e79f36.jpg", w:195, h:250 },
+  { file:"109c97b8-0b4d-441b-847d-9a77c6da5499.jpg", w:275, h:185 },
+  { file:"155be252-0b7f-4a1f-9783-5274d514c27a.jpg", w:230, h:290 },
+  { file:"15610179-6653-44a7-89a9-662277cfa04a.jpg", w:300, h:200 },
+  { file:"1f671742-fa61-44c8-8546-da79fa3de72f.jpg", w:200, h:200 },
+  { file:"2277713c-e5c1-480d-b094-4d225a4bde8c.jpg", w:185, h:240 },
+  { file:"2dfb590f-7660-4d6a-b031-6a6c97d24cc5.jpg", w:260, h:175 },
+  { file:"3105e2b9-9f42-4a5d-a5ad-333249d4a2be.jpg", w:210, h:265 },
+  { file:"32f934df-de33-4064-a614-9332bad4a855.jpg", w:290, h:195 },
+  { file:"3593790a-5b22-419a-8df0-3ce65acb87ea.jpg", w:215, h:215 },
+  { file:"36870323-d5f4-4bf1-a00b-ac4d1307890b.jpg", w:195, h:250 },
+  { file:"384be059-ad9a-4bd0-ae19-b32271b9b544.jpg", w:275, h:185 },
+  { file:"3a91836b-3e4e-428d-9574-24aa0e3a36fe.jpg", w:230, h:290 },
+  { file:"3f545d01-ff7a-4a64-ae3d-1b039b2f2c03.jpg", w:300, h:200 },
+  { file:"46230fd3-804f-4c12-ba71-e9225a5acf00.jpg", w:200, h:200 },
+  { file:"4a967de9-fbc1-4243-930a-90610059c096.jpg", w:185, h:240 },
+  { file:"4e74192d-9221-4230-b6e1-a2e8eeea7855.jpg", w:260, h:175 },
+  { file:"584df2cf-0317-4cd0-ac70-ebaf04da2ad0.jpg", w:210, h:265 },
+  { file:"5b88543e-7994-42db-b6ca-2a98f15c194e.jpg", w:290, h:195 },
+  { file:"5f15f2b2-7a1b-4827-861f-1bbe77cef6a1.jpg", w:215, h:215 },
+  { file:"63aa7df5-aa6d-4831-8e57-6ad83b41a474.jpg", w:195, h:250 },
+  { file:"65f9d442-a8f6-4c50-b384-cbe448e21412.jpg", w:275, h:185 },
+  { file:"6d9ce597-6816-42ab-8d5a-f14e19ebf0ea.jpg", w:300, h:200 },
+  { file:"6e87a685-2988-4b34-97a3-b53a264c264c.jpg", w:200, h:200 },
+  { file:"6f862228-04c2-4972-bf72-3340f94707a2.jpg", w:185, h:240 },
+  { file:"6fe56739-3de9-4d64-a776-f901f0acd761.jpg", w:260, h:175 },
+  { file:"74e06edb-b79c-420e-882f-e965dd4fc7f8.jpg", w:210, h:265 },
+  { file:"84356c4e-c79c-4a8c-9709-3de7ba71f25a.jpg", w:290, h:195 },
+  { file:"853c3517-1932-4080-9161-03c290594afe.jpg", w:215, h:215 },
+  { file:"8d459cb3-8150-41b7-a934-80a589579674.jpg", w:275, h:185 },
+  { file:"8deb3a8f-c725-4477-812d-c2fd28652be0.jpg", w:230, h:290 },
+  { file:"91896d21-671a-44b9-a0a1-50947163217e.jpg", w:300, h:200 },
+  { file:"989dc66e-69d3-47b4-8780-a4b94a05aa35.jpg", w:200, h:200 },
+  { file:"9b7cb063-7abf-4452-b6e0-d41989b1ed46.jpg", w:185, h:240 },
+  { file:"9b96676e-494d-4b7a-9e7f-744bf4ac38d3.jpg", w:260, h:175 },
+  { file:"9c1855e0-7f14-400d-beb7-d8621d48e9ea.jpg", w:210, h:265 },
+  { file:"9c7c108e-9f7b-4ac6-82a1-58251ce6118b.jpg", w:290, h:195 },
+  { file:"Arki Studio _ Simple Shelf _ Miseru Simple Shelf….jpg", w:215, h:215 },
+  { file:"Boxy Wool Twill Jacket - Black _ Manière De Voir….jpg", w:195, h:250 },
+  { file:"Designer fashion, Seoul-fully created _ W Concept.jpg", w:275, h:185 },
+  { file:"Instagram (1).jpg", w:230, h:290 },
+  { file:"MHL_ HIGH COLLAR JACKET DENSE WOOL MELTON NAVY.jpg", w:300, h:200 },
+  { file:"Masion Martin Margiela.jpg", w:200, h:200 },
+  { file:"Men_s Autumn _24– Studio Nicholson.jpg", w:185, h:240 },
+  { file:"a6695a37-0137-44b3-96a4-33c6a4bea77d.jpg", w:195, h:250 },
+  { file:"b1e15bbe-0734-42bf-9c44-ba402939efee.jpg", w:275, h:185 },
+  { file:"b6671bf3-2d64-4ff1-9278-489be035a612.jpg", w:230, h:290 },
+  { file:"b8048d62-54d5-4df2-ae15-4f454dc1777a.jpg", w:300, h:200 },
+  { file:"c0d48d92-8677-4a52-bb58-377ce0834b1c.jpg", w:200, h:200 },
+  { file:"cb322a35-3056-4a42-bb79-bfd643f9205c.jpg", w:185, h:240 },
+  { file:"ceaab978-e8a7-45c9-aadc-488b27659aca.jpg", w:260, h:175 },
+  { file:"d54b465e-155f-4835-9360-6ca7172f45ce.jpg", w:210, h:265 },
+  { file:"d90f96c7-991a-40bf-a1cf-226d9116571c.jpg", w:290, h:195 },
+  { file:"dab6c5c9-456d-4cee-9848-e219e73c6a3d.jpg", w:215, h:215 },
+  { file:"dddd7868-965e-4884-b887-bb9364bc726b.jpg", w:195, h:250 },
+  { file:"de0d96ca-0977-407e-b833-b3905bd0a708.jpg", w:275, h:185 },
+  { file:"e4ae7853-0eb9-4b09-8dcc-41772af7205f.jpg", w:230, h:290 },
+  { file:"e628fe76-b5fc-4248-a219-dd17c7ed5367.jpg", w:300, h:200 },
+  { file:"e7601664-8aa7-4d8b-890d-3fdf63d2f02c.jpg", w:200, h:200 },
+  { file:"ebb8be57-a9f5-40b6-947e-7850a1e71b35.jpg", w:185, h:240 },
+  { file:"f308a086-1378-444c-8a25-11ff423452d9.jpg", w:260, h:175 },
+  { file:"f7da3328-8423-4860-9877-f67c5b414bae.jpg", w:210, h:265 },
+  { file:"f9654229-745c-4cac-b598-22f358b58661.jpg", w:290, h:195 },
+  { file:"osteria.jpg", w:215, h:215 },
+  { file:"outfit inspo.jpg", w:195, h:250 },
 ];
 
-const SHOW = 20;
+/* ─── preload ─── */
+function preload(photos) {
+  return Promise.all(photos.map(p => new Promise(resolve => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload  = () => resolve({ ...p, img });
+    img.onerror = () => resolve(null);
+    img.src = 'images/' + encodeURIComponent(p.file);
+  }))).then(r => r.filter(Boolean));
+}
 
 function pickRandom(arr, n) {
   return [...arr].sort(() => Math.random() - .5).slice(0, n);
 }
 
-/* Проверяем фото заранее — убираем битые до раскладки */
-function preload(photos) {
-  return Promise.all(photos.map(p => new Promise(resolve => {
-    const img = new Image();
-    img.onload  = () => resolve(p);
-    img.onerror = () => resolve(null);
-    img.src = 'images/' + encodeURIComponent(p.file);
-  }))).then(results => results.filter(Boolean));
-}
+/* ─── Three.js sphere ─── */
+window.addEventListener('load', () => {
+  const stage = document.getElementById('stage');
+  const W = stage.clientWidth;
+  const H = stage.clientHeight;
 
-function buildLayout(photos) {
-  const section = document.getElementById('scatter');
-  section.innerHTML = '';
+  /* Scene */
+  const scene    = new THREE.Scene();
+  const camera   = new THREE.PerspectiveCamera(42, W / H, 1, 4000);
+  camera.position.z = 980;
 
-  const W    = section.getBoundingClientRect().width || window.innerWidth;
-  const PAD  = 70;
-  const ROWS = 4;
-  const perRow = Math.ceil(photos.length / ROWS);
-  const bandH  = Math.max(...photos.map(p => p.h)) + 150;
-  section.style.height = (bandH * ROWS + 80) + 'px';
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setSize(W, H);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setClearColor(0x000000, 0);
+  stage.appendChild(renderer.domElement);
 
-  const placed = [];
-  function overlaps(nx, ny, nw, nh) {
-    const M = 44;
-    for (const r of placed)
-      if (nx < r.x+r.w+M && nx+nw+M > r.x && ny < r.y+r.h+M && ny+nh+M > r.y) return true;
-    return false;
+  /* Lighting — soft and warm */
+  scene.add(new THREE.AmbientLight(0xfaf5f0, 1.15));
+  const dir = new THREE.DirectionalLight(0xfff8f0, 0.35);
+  dir.position.set(2, 3, 5);
+  scene.add(dir);
+
+  /* Group that we rotate */
+  const group = new THREE.Group();
+  scene.add(group);
+
+  /* Raycaster for clicks */
+  const raycaster = new THREE.Raycaster();
+  const mouse2    = new THREE.Vector2();
+  const meshMap   = new Map(); // mesh → photo data
+
+  /* Fibonacci sphere distribution */
+  function fibonacciPositions(n, R) {
+    const positions = [];
+    const goldenAngle = Math.PI * (3 - Math.sqrt(5));
+    for (let i = 0; i < n; i++) {
+      const y     = 1 - (i / (n - 1)) * 2;
+      const r     = Math.sqrt(Math.max(0, 1 - y * y));
+      const theta = goldenAngle * i;
+      positions.push(new THREE.Vector3(
+        Math.cos(theta) * r * R,
+        y * R,
+        Math.sin(theta) * r * R
+      ));
+    }
+    return positions;
   }
 
-  photos.forEach((p, i) => {
-    const row   = i % ROWS;
-    const col   = (i / ROWS) | 0;
-    const slotW = (W - PAD * 2) / perRow;
-    const bx    = PAD + col * slotW + (slotW - p.w) / 2;
-    const by    = row * bandH + 50 + (bandH - p.h) / 2;
-
-    let x = Math.max(PAD, Math.min(W - p.w - PAD, bx + (Math.random()-.5) * slotW * .4));
-    let y = Math.max(24,  by + (Math.random()-.5) * 70);
-    let t = 0;
-    while (overlaps(x, y, p.w, p.h) && t++ < 12) {
-      x = Math.max(PAD, Math.min(W - p.w - PAD, bx + (Math.random()-.5) * slotW * .55));
-      y = Math.max(24,  by + (Math.random()-.5) * 80);
+  function buildSphere(photos) {
+    /* clear old meshes */
+    while (group.children.length) {
+      const m = group.children[0];
+      m.geometry.dispose();
+      m.material.dispose();
+      group.remove(m);
     }
-    placed.push({ x, y, w: p.w, h: p.h });
+    meshMap.clear();
 
-    const pin = document.createElement('div');
-    pin.className = 'pin';
-    pin.style.cssText = 'left:'+x+'px;top:'+y+'px;width:'+p.w+'px;z-index:'+(10+i)+';';
-    pin.style.setProperty('--rot', 'rotate('+p.rot+'deg)');
+    const R         = 370;
+    const positions = fibonacciPositions(photos.length, R);
+    const maxDim    = 108;
+    const loader    = new THREE.TextureLoader();
 
-    const img = document.createElement('img');
-    img.src    = 'images/' + encodeURIComponent(p.file);
-    img.alt    = 'photo';
-    img.width  = p.w;
-    img.height = p.h;
-    pin.appendChild(img);
-    section.appendChild(pin);
+    photos.forEach((p, i) => {
+      const scale = maxDim / Math.max(p.w, p.h);
+      const pw    = p.w * scale;
+      const ph    = p.h * scale;
 
-    pin.style.opacity = '0';
-    setTimeout(() => {
-      pin.style.transform = 'rotate('+p.rot+'deg)';
-      pin.style.animation = 'pinIn .75s '+(.06 + i*.06)+'s cubic-bezier(.22,1,.36,1) both';
-    }, 10);
+      const texture = loader.load('images/' + encodeURIComponent(p.file));
+      texture.minFilter = THREE.LinearFilter;
 
-    pin.addEventListener('mouseenter', () => {
-      pin.style.transform  = 'rotate('+(p.rot*.2)+'deg) scale(1.05) translateY(-10px)';
-      pin.style.zIndex     = '100';
-      pin.style.transition = 'transform .32s cubic-bezier(.22,1,.36,1)';
+      const geo = new THREE.PlaneGeometry(pw, ph);
+      const mat = new THREE.MeshLambertMaterial({
+        map:          texture,
+        side:         THREE.FrontSide,
+        transparent:  false,
+      });
+      const mesh = new THREE.Mesh(geo, mat);
+
+      const pos = positions[i];
+      mesh.position.copy(pos);
+
+      /* Orient plane to face outward from sphere center */
+      const outward = pos.clone().normalize();
+      mesh.quaternion.setFromUnitVectors(
+        new THREE.Vector3(0, 0, 1),
+        outward
+      );
+
+      /* Tiny random roll for a scattered feel */
+      const roll = (Math.random() - .5) * 0.22;
+      mesh.rotateZ(roll);
+
+      group.add(mesh);
+      meshMap.set(mesh, p);
     });
-    pin.addEventListener('mouseleave', () => {
-      pin.style.transform  = 'rotate('+p.rot+'deg)';
-      pin.style.zIndex     = String(10 + i);
-      pin.style.transition = 'transform .44s cubic-bezier(.22,1,.36,1)';
-    });
-    pin.addEventListener('click', () => {
-      document.getElementById('lb-img').src = 'images/' + encodeURIComponent(p.file);
-      document.getElementById('lb').classList.add('on');
-      document.body.style.overflow = 'hidden';
-    });
+  }
+
+  /* ─── Load & build ─── */
+  preload(pickRandom(ALL_PHOTOS, 36)).then(good => {
+    const loading = document.getElementById('loading');
+    loading.classList.add('hidden');
+    setTimeout(() => { loading.style.display = 'none'; }, 700);
+    buildSphere(good.slice(0, 32));
   });
-}
 
-function reshuffle() {
-  const section = document.getElementById('scatter');
-  [...section.querySelectorAll('.pin')].forEach((pin, i) => {
-    pin.style.transition = 'opacity .28s '+(i*.018)+'s, transform .28s '+(i*.018)+'s';
-    pin.style.opacity    = '0';
-    pin.style.transform  = (pin.style.transform || '') + ' translateY(-14px) scale(.95)';
+  /* ─── Drag rotation ─── */
+  let isDragging  = false;
+  let prevX = 0, prevY = 0;
+  let velX  = 0, velY  = 0;
+  let didDrag = false;
+
+  renderer.domElement.addEventListener('mousedown', e => {
+    isDragging = true; didDrag = false;
+    prevX = e.clientX; prevY = e.clientY;
+    velX = velY = 0;
   });
-  setTimeout(() => {
-    preload(pickRandom(ALL_PHOTOS, SHOW + 6)).then(good => {
-      buildLayout(good.slice(0, SHOW));
-    });
-  }, 350);
-}
+  window.addEventListener('mouseup', () => { isDragging = false; });
+  window.addEventListener('mousemove', e => {
+    if (!isDragging) return;
+    const dx = e.clientX - prevX;
+    const dy = e.clientY - prevY;
+    if (Math.abs(dx) + Math.abs(dy) > 3) didDrag = true;
+    velY = dx * 0.007;
+    velX = dy * 0.007;
+    group.rotateY(velY);
+    group.rotateX(velX);
+    prevX = e.clientX; prevY = e.clientY;
+  });
 
-/* window.load — ширина точно известна, шрифты загружены */
-window.addEventListener('load', () => {
-  preload(pickRandom(ALL_PHOTOS, SHOW + 6)).then(good => {
-    buildLayout(good.slice(0, SHOW));
+  /* touch */
+  renderer.domElement.addEventListener('touchstart', e => {
+    isDragging = true; didDrag = false;
+    prevX = e.touches[0].clientX; prevY = e.touches[0].clientY;
+    velX = velY = 0;
+  }, { passive: true });
+  window.addEventListener('touchend', () => { isDragging = false; });
+  window.addEventListener('touchmove', e => {
+    if (!isDragging) return;
+    const dx = e.touches[0].clientX - prevX;
+    const dy = e.touches[0].clientY - prevY;
+    if (Math.abs(dx) + Math.abs(dy) > 3) didDrag = true;
+    velY = dx * 0.007; velX = dy * 0.007;
+    group.rotateY(velY); group.rotateX(velX);
+    prevX = e.touches[0].clientX; prevY = e.touches[0].clientY;
+  }, { passive: true });
+
+  /* ─── Click → lightbox ─── */
+  renderer.domElement.addEventListener('click', e => {
+    if (didDrag) return;
+    const rect = renderer.domElement.getBoundingClientRect();
+    mouse2.x =  ((e.clientX - rect.left)  / rect.width)  * 2 - 1;
+    mouse2.y = -((e.clientY - rect.top)   / rect.height) * 2 + 1;
+    raycaster.setFromCamera(mouse2, camera);
+    const hits = raycaster.intersectObjects(group.children);
+    if (!hits.length) return;
+    const p = meshMap.get(hits[0].object);
+    if (!p) return;
+    document.getElementById('lb-img').src = 'images/' + encodeURIComponent(p.file);
+    document.getElementById('lb').classList.add('on');
+    document.body.style.overflow = 'hidden';
+  });
+
+  /* ─── Animate ─── */
+  function animate() {
+    requestAnimationFrame(animate);
+    if (!isDragging) {
+      /* slow auto-rotation + momentum decay */
+      group.rotateY(0.0022 + velY * 0.05);
+      group.rotateX(velX * 0.05);
+      velX *= 0.92;
+      velY *= 0.92;
+    }
+    renderer.render(scene, camera);
+  }
+  animate();
+
+  /* ─── Resize ─── */
+  window.addEventListener('resize', () => {
+    const nw = stage.clientWidth, nh = stage.clientHeight;
+    camera.aspect = nw / nh;
+    camera.updateProjectionMatrix();
+    renderer.setSize(nw, nh);
   });
 });
 
+/* ─── Lightbox ─── */
+function lbClose(e, force) {
+  if (force || (e && e.target.id === 'lb')) {
+    document.getElementById('lb').classList.remove('on');
+    document.body.style.overflow = '';
+    setTimeout(() => { document.getElementById('lb-img').src = ''; }, 300);
+  }
+}
 document.addEventListener('keydown', e => { if (e.key === 'Escape') lbClose(null, true); });
 </script>
 </body>
