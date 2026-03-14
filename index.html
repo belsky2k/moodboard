@@ -108,20 +108,7 @@ body::after {
   filter: contrast(1.06) saturate(0.85);
 }
 /* red corner accent */
-.lb-frame::before {
-  content: '';
-  position: absolute; top: -4px; left: -4px;
-  width: 24px; height: 24px;
-  border-top: 2px solid #ff3c00;
-  border-left: 2px solid #ff3c00;
-}
-.lb-frame::after {
-  content: '';
-  position: absolute; bottom: -4px; right: -4px;
-  width: 24px; height: 24px;
-  border-bottom: 2px solid #ff3c00;
-  border-right: 2px solid #ff3c00;
-}
+
 .lb-close {
   position: fixed; top: 1.4rem; right: 1.6rem;
   font-family: monospace; font-size: .75rem;
@@ -231,7 +218,7 @@ function shuffle(a){ return a.slice().sort(function(){return Math.random()-.5;})
 function rnd(a,b){ return a + Math.random()*(b-a); }
 
 /* ── grid setup ── */
-var COLS = window.innerWidth < 700 ? 3 : window.innerWidth < 1100 ? 5 : 7;
+var COLS = window.innerWidth < 700 ? 2 : window.innerWidth < 1100 ? 3 : 5;
 var ROWS = Math.ceil(70 / COLS);
 var COUNT = COLS * ROWS;
 
