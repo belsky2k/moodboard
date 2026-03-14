@@ -318,14 +318,14 @@ var meshMap   = {};
 var meshList  = [];
 
 /* Build sphere immediately — textures stream in */
-var selection = pickRandom(ALL_PHOTOS, 32);
-var R         = 270;
-var maxDim    = 220;
+var selection = pickRandom(ALL_PHOTOS, 40);
+var R         = 360;
+var maxDim    = 155;
 var positions = fibPositions(selection.length, R);
 var loader    = new THREE.TextureLoader();
 
 selection.forEach(function(p, i) {
-  var scale = maxDim / Math.min(p.w, p.h);
+  var scale = maxDim / Math.max(p.w, p.h);
   var pw = p.w * scale;
   var ph = p.h * scale;
 
