@@ -400,13 +400,23 @@ pool.forEach(function(file, i) {
 });
 
 /* ── physics ── */
-var REPEL_R = 240, REPEL_F = 70, TILT = 18, LERP = 0.09;
+var PUSH_F = 28, LERP = 0.09;
 var mx = -9999, my = -9999;
+
+/* Currently hovered card data object (null = none) */
+var hoveredCard = null;
 
 function lerp(a, b, t) { return a + (b - a) * t; }
 
 window.addEventListener('mousemove', function(e) { mx = e.clientX; my = e.clientY; });
 window.addEventListener('mouseleave', function()  { mx = -9999; my = -9999; });
+
+/* Track exactly which card is under the cursor — no radius, no neighbours */
+grid.addEventListener('mouseover', function(e) {
+  var cardEl = e.target.closest('.card');
+  hoveredCard = (cardEl && cardEl._poolIdx !== undefined) ? cards[cardEl._poolIdx] : null;
+});
+grid.addEventListener('mouseleave', function() { hoveredCard = null; });
 
 setInterval(function() {
   if (Math.random() > 0.7) return;
@@ -420,20 +430,17 @@ function tick() {
   cards.forEach(function(c) {
     if (!c.ready) return;
 
-    /* ── FIX 5: Use cached rest-center + current offset instead of
-                getBoundingClientRect() on every frame ── */
-    var cx = c.restCx + c.tx;
-    var cy = c.restCy + c.ty;
-    var dx = cx - mx, dy = cy - my;
-    var dist = Math.sqrt(dx * dx + dy * dy);
-
-    if (dist < REPEL_R && dist > 0) {
-      var str  = 1 - dist / REPEL_R;
-      var push = str * REPEL_F;
-      c.ttx = (dx / dist) * push;
-      c.tty = (dy / dist) * push;
-      c.trz = c.baseRot + (dx / dist) * TILT * str * 1.4;
-      c.tsc = 1 + 0.08 * str;
+    if (c === hoveredCard) {
+      /* Push card away from cursor; rotation stays fixed — no shaking */
+      var dx = (c.restCx + c.tx) - mx;
+      var dy = (c.restCy + c.ty) - my;
+      var dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist > 0) {
+        c.ttx = (dx / dist) * PUSH_F;
+        c.tty = (dy / dist) * PUSH_F;
+      }
+      c.trz = c.baseRot; /* rotation unchanged */
+      c.tsc = 1.09;
     } else {
       c.ttx = 0; c.tty = 0; c.trz = c.baseRot; c.tsc = 1;
     }
