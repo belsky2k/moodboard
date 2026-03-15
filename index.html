@@ -474,42 +474,54 @@ window.addEventListener('mouseleave', function()  { mx = -9999; my = -9999; clea
  */
 
 /*
- * Sequential shine — left→right, top→bottom, starts only after
- * every image on the page has loaded (or errored out).
+ * Sequential shine — left→right, top→bottom.
  *
- * SHINE_STEP  — gap between each card's shine (ms)
- * SHINE_PAUSE — pause after the full wave before looping (ms)
+ * SHINE_STEP  — delay between cards (ms); scales so the full wave
+ *               always takes ~3 s regardless of how many cards are on screen.
+ * SHINE_PAUSE — rest between waves (ms).
+ *
+ * Start condition: all images settled (loaded or errored).
+ * Hard fallback  : start anyway after 6 s in case any event was missed
+ *                  (common on iOS when images load from cache synchronously).
  */
-var SHINE_STEP  = 120;
-var SHINE_PAUSE = 3000;
+var SHINE_STEP  = Math.round(6000 / cards.length); /* wave always ~6 s */
+var SHINE_PAUSE = 5000;
 
-var imgsTotal  = cards.length;
-var imgsLoaded = 0;
+var imgsTotal    = cards.length;
+var imgsLoaded   = 0;
 var shineStarted = false;
 
 function onImgSettled() {
+  if (shineStarted) return;
   imgsLoaded++;
-  if (imgsLoaded >= imgsTotal && !shineStarted) {
-    shineStarted = true;
-    runShineWave();
-  }
+  if (imgsLoaded >= imgsTotal) startShine();
 }
 
-/* attach load/error counters to every card image */
+function startShine() {
+  if (shineStarted) return;
+  shineStarted = true;
+  runShineWave();
+}
+
+/* Hard fallback — if events were missed (iOS cache quirk etc.) */
+var shineTimeout = setTimeout(startShine, 6000);
+
+/* Attach settled-counters to every card image.
+   Check naturalWidth > 0 (not just .complete) — on iOS .complete can be
+   true for a broken/pending image, naturalWidth is 0 until decoded. */
 cards.forEach(function(c) {
   var img = c.el.querySelector('img');
   if (!img) { onImgSettled(); return; }
-  if (img.complete) { onImgSettled(); return; }
+  if (img.complete && img.naturalWidth > 0) { onImgSettled(); return; }
   img.addEventListener('load',  onImgSettled, { once: true });
   img.addEventListener('error', onImgSettled, { once: true });
 });
 
 function runShineWave() {
-  /* cards are already in DOM order = left→right, top→bottom */
+  clearTimeout(shineTimeout); /* cancel fallback once wave is running */
   var i = 0;
   function next() {
     if (i >= cards.length) {
-      /* full wave done — pause, then loop */
       setTimeout(runShineWave, SHINE_PAUSE);
       return;
     }
