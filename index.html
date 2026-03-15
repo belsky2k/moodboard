@@ -374,6 +374,18 @@ var currentIdx = -1;
 
 var cards = [];
 
+/* declared before the forEach so it's available during card creation */
+function attachHover(c) {
+  c.el.addEventListener('mouseenter', function() {
+    clearTimeout(hoverTimer);
+    hoverTimer = setTimeout(function() { hoveredCard = c; }, 55);
+  });
+  c.el.addEventListener('mouseleave', function() {
+    clearTimeout(hoverTimer);
+    if (hoveredCard === c) hoveredCard = null;
+  });
+}
+
 pool.forEach(function(file, i) {
   var row = Math.floor(i / COLS);
   var col = i % COLS;
@@ -420,6 +432,7 @@ pool.forEach(function(file, i) {
   });
 
   cards.push(c);
+  attachHover(c);
 });
 
 /* ── physics ── */
@@ -450,23 +463,15 @@ function spring(cur, vel, target, k, d) {
 var hoveredCard = null;
 var hoverTimer  = null;
 
-window.addEventListener('mousemove', function(e) { mx = e.clientX; my = e.clientY; });
+window.addEventListener('mousemove',  function(e) { mx = e.clientX; my = e.clientY; });
 window.addEventListener('mouseleave', function()  { mx = -9999; my = -9999; clearTimeout(hoverTimer); hoveredCard = null; });
 
-/* Debounce: card only activates if cursor stays on it for 60 ms.
-   Fast sweeps skip the pop entirely — no flicker between cards. */
-grid.addEventListener('mouseover', function(e) {
-  var cardEl = e.target.closest('.card');
-  var next   = (cardEl && cardEl._poolIdx !== undefined) ? cards[cardEl._poolIdx] : null;
-  if (next === hoveredCard) return;
-  clearTimeout(hoverTimer);
-  if (next) {
-    hoverTimer = setTimeout(function() { hoveredCard = next; }, 60);
-  } else {
-    hoveredCard = null;
-  }
-});
-grid.addEventListener('mouseleave', function() { clearTimeout(hoverTimer); hoveredCard = null; });
+/*
+ * mouseenter/mouseleave attached directly on each card (see attachHover above).
+ * Delegated mouseover re-fires when a card's z-index changes and covers the
+ * cursor, creating an oscillation loop. mouseenter/mouseleave don't bubble
+ * and are immune to z-index shifts — no more flicker.
+ */
 
 /*
  * Shine burst:
@@ -476,8 +481,8 @@ grid.addEventListener('mouseleave', function() { clearTimeout(hoverTimer); hover
  *   Cards are picked from a shuffled pool so the same card isn't
  *   picked twice in one burst and repeats are spread out naturally.
  */
-var SHINE_BURST = 1; /* one card at a time — groups feel spammy */
-var SHINE_EVERY = Math.max(1800, Math.round(COUNT * 120)); /* ~2–4 s depending on card count */
+var SHINE_BURST = 2;
+var SHINE_EVERY = Math.max(2200, Math.round(COUNT * 100));
 
 var shinePool = []; /* shuffled index pool, refilled when empty */
 
