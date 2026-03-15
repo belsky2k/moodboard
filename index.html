@@ -42,7 +42,8 @@ html, body {
   pointer-events: none;
   user-select: none;
   filter: contrast(1.04) saturate(0.88);
-  transition: filter .2s;
+  transition: filter .2s, opacity .5s ease;
+  opacity: 0; /* fades in once loaded — see img.onload in JS */
 }
 
 .card.glitch img {
@@ -368,8 +369,11 @@ pool.forEach(function(file, i) {
 
   var img = document.createElement('img');
   img.src     = 'images/' + encodeURIComponent(file);
-  img.loading = i < COLS * 2 ? 'eager' : 'lazy';
-  img.onerror = function() { card.style.background = '#1a1815'; };
+  img.loading = 'eager'; /* all eager — welcome screen gives browser time to preload */
+  img.onerror = function() { card.style.background = '#1a1815'; img.style.opacity = '0'; };
+  img.onload  = function() { img.style.opacity = '1'; }; /* fade in once ready */
+  /* already cached (e.g. repeat visit) */
+  if (img.complete && img.naturalWidth) img.style.opacity = '1';
 
   card.appendChild(img);
   grid.appendChild(card);
