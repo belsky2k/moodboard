@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="en">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -474,48 +474,54 @@ window.addEventListener('mouseleave', function()  { mx = -9999; my = -9999; clea
  */
 
 /*
- * Shine burst:
- *   SHINE_BURST  — how many cards light up per tick (scales with COUNT)
- *   SHINE_EVERY  — interval between bursts (ms), scales inversely with COUNT
- *                  more cards → shorter wait, feels proportional
- *   Cards are picked from a shuffled pool so the same card isn't
- *   picked twice in one burst and repeats are spread out naturally.
+ * Sequential shine — left→right, top→bottom, starts only after
+ * every image on the page has loaded (or errored out).
+ *
+ * SHINE_STEP  — gap between each card's shine (ms)
+ * SHINE_PAUSE — pause after the full wave before looping (ms)
  */
-var SHINE_BURST = 2;
-var SHINE_EVERY = Math.max(2200, Math.round(COUNT * 100));
+var SHINE_STEP  = 120;
+var SHINE_PAUSE = 3000;
 
-var shinePool = []; /* shuffled index pool, refilled when empty */
+var imgsTotal  = cards.length;
+var imgsLoaded = 0;
+var shineStarted = false;
 
-function pickShineCards() {
-  /* refill when pool runs low */
-  if (shinePool.length < SHINE_BURST) {
-    var idx = cards.map(function(_, i) { return i; });
-    for (var i = idx.length - 1; i > 0; i--) {
-      var j = Math.floor(Math.random() * (i + 1));
-      var t = idx[i]; idx[i] = idx[j]; idx[j] = t;
-    }
-    shinePool = shinePool.concat(idx);
+function onImgSettled() {
+  imgsLoaded++;
+  if (imgsLoaded >= imgsTotal && !shineStarted) {
+    shineStarted = true;
+    runShineWave();
   }
-  var picked = [];
-  while (picked.length < SHINE_BURST && shinePool.length) {
-    var ci = shinePool.shift();
-    var c  = cards[ci];
-    if (c.ready && !c.el.classList.contains('shine')) {
-      picked.push(c);
-    }
-  }
-  return picked;
 }
 
-setInterval(function() {
-  pickShineCards().forEach(function(c, i) {
-    /* stagger each card in the burst slightly so they don't all flash at once */
-    setTimeout(function() {
+/* attach load/error counters to every card image */
+cards.forEach(function(c) {
+  var img = c.el.querySelector('img');
+  if (!img) { onImgSettled(); return; }
+  if (img.complete) { onImgSettled(); return; }
+  img.addEventListener('load',  onImgSettled, { once: true });
+  img.addEventListener('error', onImgSettled, { once: true });
+});
+
+function runShineWave() {
+  /* cards are already in DOM order = left→right, top→bottom */
+  var i = 0;
+  function next() {
+    if (i >= cards.length) {
+      /* full wave done — pause, then loop */
+      setTimeout(runShineWave, SHINE_PAUSE);
+      return;
+    }
+    var c = cards[i++];
+    if (c.ready && !c.el.classList.contains('shine')) {
       c.el.classList.add('shine');
       setTimeout(function() { c.el.classList.remove('shine'); }, 950);
-    }, i * 120);
-  });
-}, SHINE_EVERY);
+    }
+    setTimeout(next, SHINE_STEP);
+  }
+  next();
+}
 
 function tick() {
   requestAnimationFrame(tick);
