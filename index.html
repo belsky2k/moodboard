@@ -368,12 +368,20 @@ pool.forEach(function(file, i) {
     'cubic-bezier(.22,1,.36,1) both';
 
   var img = document.createElement('img');
+  img.decoding = 'async';
+
+  /* onload / onerror MUST be attached before setting src —
+     otherwise a cached image can fire load synchronously
+     before the handler exists, leaving opacity stuck at 0. */
+  img.onload  = function() { img.style.opacity = '1'; };
+  img.onerror = function() { card.style.background = '#1a1815'; img.style.opacity = '1'; };
+
+  img.loading = 'eager';
   img.src     = 'images/' + encodeURIComponent(file);
-  img.loading = 'eager'; /* all eager — welcome screen gives browser time to preload */
-  img.onerror = function() { card.style.background = '#1a1815'; img.style.opacity = '0'; };
-  img.onload  = function() { img.style.opacity = '1'; }; /* fade in once ready */
-  /* already cached (e.g. repeat visit) */
-  if (img.complete && img.naturalWidth) img.style.opacity = '1';
+
+  /* Hard fallback: some mobile browsers never fire onload for
+     images behind a fixed overlay. Force-reveal after 4 s. */
+  setTimeout(function() { img.style.opacity = '1'; }, 4000);
 
   card.appendChild(img);
   grid.appendChild(card);
