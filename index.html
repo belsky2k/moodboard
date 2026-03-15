@@ -32,13 +32,13 @@ html, body {
   cursor: pointer;
   will-change: transform;
   border-radius: 10px;
-  /* height + z-index set by JS */
+  background: #141210; /* fills letterbox areas for non-square images */
 }
 
 .card img {
   display: block;
   width: 100%; height: 100%;
-  object-fit: cover;
+  object-fit: contain;   /* full image, no cropping */
   pointer-events: none;
   user-select: none;
   filter: contrast(1.04) saturate(0.88);
@@ -107,34 +107,32 @@ body::after {
 .lb {
   display: none; position: fixed; inset: 0; z-index: 900;
   background: rgba(14,13,12,.96);
-  padding: clamp(2.4rem, 5vw, 3.6rem) clamp(2.8rem, 7vw, 4.8rem) clamp(2rem, 4vw, 2.8rem);
+  /* safe zones for UI controls, plus device notch/home-bar */
+  padding-top:    max(3.2rem, env(safe-area-inset-top,    0px));
+  padding-bottom: max(2.4rem, env(safe-area-inset-bottom, 0px));
+  padding-left:   max(3.2rem, env(safe-area-inset-left,   0px));
+  padding-right:  max(3.2rem, env(safe-area-inset-right,  0px));
   align-items: center; justify-content: center; cursor: default;
 }
 .lb.on { display: flex; }
 
 .lb-frame {
-  max-width: 100%;
-  max-height: 100%;
   position: relative;
-  border-radius: 14px;
-  overflow: hidden;
   display: flex; align-items: center; justify-content: center;
+  /* shrink to fit image — no fixed size */
+  max-width: 100%; max-height: 100%;
+  border-radius: 14px; overflow: hidden;
 }
 .lb-frame img {
   display: block;
+  /* auto dimensions — browser sizes naturally to original aspect ratio */
   width: auto; height: auto;
-  max-width:  min(100%, calc(100vw - clamp(5.6rem, 14vw, 9.6rem)));
-  max-height: min(100%, calc(100vh - clamp(4.4rem,  9vw, 6.4rem)));
+  /* never exceed the safe viewport area */
+  max-width:  100%;
+  max-height: 100%;
   object-fit: contain;
   filter: contrast(1.06) saturate(0.85);
   border-radius: 14px;
-}
-
-@media (max-width: 600px) {
-  .lb-frame img {
-    max-width:  calc(100vw - 5.6rem);
-    max-height: calc(100vh - 4.4rem);
-  }
 }
 
 @keyframes lbOpen  { from { opacity:0; transform: scale(.96) skewX(-1deg); } to { opacity:1; transform: scale(1) skewX(0); } }
@@ -345,6 +343,26 @@ var cardHeight = rowHeight * 3;
 var grid = document.getElementById('grid');
 grid.style.gridTemplateColumns = 'repeat(' + COLS + ', 1fr)';
 grid.style.gridTemplateRows    = 'repeat(' + ROWS + ', ' + rowHeight.toFixed(2) + 'px)';
+
+/* Recalculate row/card heights on resize (handles zoom and orientation change).
+   Column count is fixed per session to avoid full DOM rebuild.               */
+window.addEventListener('resize', function() {
+  var newVH = window.innerHeight;
+  if (Math.abs(newVH - VH) < 2) return; /* ignore sub-pixel jitter */
+  VH = newVH;
+  rowHeight  = VH / (ROWS + 2);
+  cardHeight = rowHeight * 3;
+  grid.style.gridTemplateRows = 'repeat(' + ROWS + ', ' + rowHeight.toFixed(2) + 'px)';
+  cards.forEach(function(c) {
+    c.el.style.height = cardHeight.toFixed(2) + 'px';
+    /* invalidate cached rest-center so physics stays accurate */
+    if (c.ready) {
+      var rect = c.el.getBoundingClientRect();
+      c.restCx = rect.left + rect.width  / 2;
+      c.restCy = rect.top  + rect.height / 2;
+    }
+  });
+});
 
 /* ── FIX 2: Pool fill without intermediate array churn ── */
 var pool = [];
