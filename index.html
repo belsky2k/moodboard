@@ -179,6 +179,20 @@ body::after {
   70%  { opacity: 1; }
   100% { opacity: 0; }
 }
+.orbit-wrap {
+  position: absolute; inset: 0;
+  pointer-events: none;
+  display: flex; align-items: center; justify-content: center;
+}
+.orbit-svg {
+  width: min(80vw, 80vh); height: min(80vw, 80vh);
+  animation: spinOrbit 22s linear infinite;
+  opacity: .55;
+}
+@keyframes spinOrbit {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
 @keyframes wFadeIn {
   from { opacity: 0; } to { opacity: 1; }
 }
@@ -196,6 +210,16 @@ body::after {
     здесь можно просто посмотреть<br>
     мои сохранённые фото
     <span>[ кликни в любом месте, чтобы начать ]</span>
+  </div>
+  <div class="orbit-wrap">
+    <svg class="orbit-svg" viewBox="0 0 600 600" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <path id="c" d="M 300,300 m -260,0 a 260,260 0 1,1 520,0 a 260,260 0 1,1 -520,0"/>
+      </defs>
+      <text font-family="monospace" font-size="11" fill="#3D3B38" letter-spacing="4">
+        <textPath href="#c" startOffset="0%">при каждом обновлении — новая подборка · при каждом обновлении — новая подборка · при каждом обновлении — новая подборка · при каждом обновлении — новая подборка · </textPath>
+      </text>
+    </svg>
   </div>
 </div>
 
