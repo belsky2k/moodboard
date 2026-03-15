@@ -187,8 +187,11 @@ body::after {
   overflow: hidden; /* keep oversized mobile orbit from causing layout shifts */
 }
 .orbit-svg {
-  width: min(80vw,80vh); height: min(80vw,80vh);
-  flex-shrink: 0; /* prevent flexbox from squishing it */
+  /* min() keeps orbit inside any viewport.
+     88vw on portrait 375px → ⌀ 330px, which comfortably
+     surrounds the 3-line text block (~220px tall).         */
+  width: min(88vw, 88vh); height: min(88vw, 88vh);
+  flex-shrink: 0;
   animation: spinOrbit 22s linear infinite; opacity: .55;
 }
 @keyframes spinOrbit { to { transform: rotate(360deg); } }
@@ -196,10 +199,6 @@ body::after {
 @keyframes wFadeOut { from{opacity:1;} to{opacity:0;} }
 
 @media (max-width:700px) {
-  .orbit-svg {
-    width:  max(100vw, 100vh);
-    height: max(100vw, 100vh);
-  }
   .lb-arrow { font-size:2rem; padding:.8rem 1rem; }
 }</style>
 </head>
@@ -376,10 +375,8 @@ pool.forEach(function(file, i) {
   var c = {
     el: card, file: file, row: row, baseRot: rot,
     tx:0, ty:0, rz:rot, sc:1,
+    vx:0, vy:0, vs:0,          /* spring velocities */
     ttx:0, tty:0, trz:rot, tsc:1,
-    /* restCx/restCy: center of the card at rest (no physics offset).
-       Captured once in animationend — eliminates getBoundingClientRect
-       from the hot tick loop entirely.                                  */
     restCx: 0, restCy: 0,
     ready: false,
   };
@@ -400,13 +397,31 @@ pool.forEach(function(file, i) {
 });
 
 /* ── physics ── */
-var PUSH_F = 28, LERP = 0.09;
+var PUSH_F = 28;
 var mx = -9999, my = -9999;
+
+/*
+ * Spring constants:
+ *   K  — stiffness  (higher = snappier)
+ *   D  — damping    (lower  = more overshoot / "pop" feel)
+ *
+ * translate/scale use different damping:
+ *   translate: D=0.62 → noticeable overshoot, card visibly jumps
+ *   scale:     D=0.58 → slightly more overshoot for the size pop
+ * Return-to-rest uses higher damping so the settle is smooth, not bouncy.
+ */
+var SP_K   = 0.22;   /* stiffness                        */
+var SP_D   = 0.62;   /* damping while hovered            */
+var SP_D_R = 0.72;   /* damping while returning to rest  */
+
+function spring(cur, vel, target, k, d) {
+  var f  = (target - cur) * k;
+  vel    = vel * d + f;
+  return { v: vel, x: cur + vel };
+}
 
 /* Currently hovered card data object (null = none) */
 var hoveredCard = null;
-
-function lerp(a, b, t) { return a + (b - a) * t; }
 
 window.addEventListener('mousemove', function(e) { mx = e.clientX; my = e.clientY; });
 window.addEventListener('mouseleave', function()  { mx = -9999; my = -9999; });
@@ -430,8 +445,10 @@ function tick() {
   cards.forEach(function(c) {
     if (!c.ready) return;
 
-    if (c === hoveredCard) {
-      /* Push card away from cursor; rotation stays fixed — no shaking */
+    var hovered = (c === hoveredCard);
+    var damp = hovered ? SP_D : SP_D_R;
+
+    if (hovered) {
       var dx = (c.restCx + c.tx) - mx;
       var dy = (c.restCy + c.ty) - my;
       var dist = Math.sqrt(dx * dx + dy * dy);
@@ -439,16 +456,20 @@ function tick() {
         c.ttx = (dx / dist) * PUSH_F;
         c.tty = (dy / dist) * PUSH_F;
       }
-      c.trz = c.baseRot; /* rotation unchanged */
-      c.tsc = 1.09;
+      c.tsc = 1.10;
     } else {
-      c.ttx = 0; c.tty = 0; c.trz = c.baseRot; c.tsc = 1;
+      c.ttx = 0; c.tty = 0; c.tsc = 1;
     }
+    c.trz = c.baseRot; /* rotation never changes */
 
-    c.tx = lerp(c.tx, c.ttx, LERP);
-    c.ty = lerp(c.ty, c.tty, LERP);
-    c.rz = lerp(c.rz, c.trz, LERP);
-    c.sc = lerp(c.sc, c.tsc, LERP);
+    var rx = spring(c.tx, c.vx, c.ttx, SP_K, damp);
+    var ry = spring(c.ty, c.vy, c.tty, SP_K, damp);
+    var rs = spring(c.sc, c.vs, c.tsc, SP_K, damp);
+    c.tx = rx.x; c.vx = rx.v;
+    c.ty = ry.x; c.vy = ry.v;
+    c.sc = rs.x; c.vs = rs.v;
+    /* rotation: simple lerp is fine — it never overshoots anyway */
+    c.rz += (c.trz - c.rz) * 0.12;
 
     c.el.style.transform =
       'translate(' + c.tx.toFixed(1) + 'px,' + c.ty.toFixed(1) + 'px)' +
