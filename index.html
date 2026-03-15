@@ -156,7 +156,7 @@ body::after {
 }
 .welcome-text {
   font-family: monospace;
-  font-size: clamp(1rem, 2vw, 1.4rem);
+  font-size: clamp(.9rem, 1.8vw, 1.2rem);
   line-height: 1.9;
   color: #E8E0D4;
   letter-spacing: .04em;
@@ -188,6 +188,11 @@ body::after {
   width: min(80vw, 80vh); height: min(80vw, 80vh);
   animation: spinOrbit 22s linear infinite;
   opacity: .55;
+}
+@media (max-width: 700px) {
+  .orbit-svg { width: 80vw; height: 80vw; }
+  .welcome-text { font-size: clamp(.9rem, 1.8vw, 1.2rem); }
+  .welcome-text span { font-size: .72rem; }
 }
 @keyframes spinOrbit {
   from { transform: rotate(0deg); }
