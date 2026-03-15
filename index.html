@@ -32,13 +32,12 @@ html, body {
   cursor: pointer;
   will-change: transform;
   border-radius: 10px;
-  background: #141210; /* fills letterbox areas for non-square images */
 }
 
 .card img {
   display: block;
   width: 100%; height: 100%;
-  object-fit: contain;   /* full image, no cropping */
+  object-fit: cover;
   pointer-events: none;
   user-select: none;
   filter: contrast(1.04) saturate(0.88);
