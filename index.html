@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Мудборд</title>
+<title>—</title>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -184,9 +184,11 @@ body::after {
 .orbit-wrap {
   position: absolute; inset: 0; pointer-events: none;
   display: flex; align-items: center; justify-content: center;
+  overflow: hidden; /* keep oversized mobile orbit from causing layout shifts */
 }
 .orbit-svg {
   width: min(80vw,80vh); height: min(80vw,80vh);
+  flex-shrink: 0; /* prevent flexbox from squishing it */
   animation: spinOrbit 22s linear infinite; opacity: .55;
 }
 @keyframes spinOrbit { to { transform: rotate(360deg); } }
@@ -194,8 +196,15 @@ body::after {
 @keyframes wFadeOut { from{opacity:1;} to{opacity:0;} }
 
 @media (max-width:700px) {
-  .orbit-svg { width:80vw; height:80vw; }
-  .lb-arrow  { font-size:2rem; padding:.8rem 1rem; }
+  /* On portrait mobile min(80vw,80vh)=80vw can be smaller than the text block.
+     Use max(100vw,100vh) so the orbit is always the viewport's LONGER side:
+       portrait 375×667 → 667px → orbit ⌀≈578px > text ≈311px ✓
+       landscape 667×375 → same 667px ✓                                      */
+  .orbit-svg {
+    width:  max(100vw, 100vh);
+    height: max(100vw, 100vh);
+  }
+  .lb-arrow { font-size:2rem; padding:.8rem 1rem; }
 }</style>
 </head>
 <body>
@@ -369,13 +378,20 @@ pool.forEach(function(file, i) {
   card.appendChild(img);
   grid.appendChild(card);
 
-  cards.push({
+  var c = {
     el: card, file: file, row: row, baseRot: rot,
     tx:0, ty:0, rz:rot, sc:1,
     ttx:0, tty:0, trz:rot, tsc:1,
-  });
+    /* ready becomes true after the CSS entry animation ends.
+       The tick loop skips cards that are still animating so it
+       never writes style.transform over @keyframes cardIn.      */
+    ready: false,
+  };
+  card.addEventListener('animationend', function() { c.ready = true; });
+  cards.push(c);
 
-  card.addEventListener('click', function() { openLb(i); });
+  /* no per-card click — handled by the grid click below
+     so cursor grid-position drives the target, not DOM hit-test */
 });
 
 /* ── physics ── */
@@ -397,6 +413,10 @@ setInterval(function(){
 function tick(){
   requestAnimationFrame(tick);
   cards.forEach(function(c){
+    /* Skip cards still in their entry animation — writing style.transform
+       here would override @keyframes cardIn and break the stagger.       */
+    if (!c.ready) return;
+
     var rect = c.el.getBoundingClientRect();
     var cx = rect.left + rect.width/2;
     var cy = rect.top  + rect.height/2;
@@ -430,24 +450,40 @@ function tick(){
 }
 tick();
 
+/* ── grid click: determine card by cursor grid-position ────────────────────
+ *  Physics repel moves cards visually. If we relied on DOM event.target the
+ *  displaced card (which moved away) would never match the cursor position.
+ *  Instead: map the raw click coordinates to the solitaire grid cell.
+ *
+ *  Visible area of each card (except last row) = top rowHeight strip.
+ *  col = floor(x / colWidth),  row = floor(y / rowHeight)
+ *  → directly identifies which card header was tapped/clicked.
+ * ─────────────────────────────────────────────────────────────────────────── */
+var VW_live = window.innerWidth; /* may differ from VW after orientation change */
+grid.addEventListener('click', function(e) {
+  if (lb.classList.contains('on')) return;
+  var colWidth = VW_live / COLS;
+  var col = Math.floor(e.clientX / colWidth);
+  var row = Math.floor(e.clientY / rowHeight);
+  col = Math.max(0, Math.min(COLS - 1, col));
+  row = Math.max(0, Math.min(ROWS - 1, row));
+  var idx = row * COLS + col;
+  if (idx >= 0 && idx < COUNT) openLb(idx);
+});
+window.addEventListener('resize', function() { VW_live = window.innerWidth; });
+
 /* ── lightbox ── */
 var lb        = document.getElementById('lb');
 var lbFrame   = document.getElementById('lb-frame');
 var lbImg     = document.getElementById('lb-img');
 var lbCounter = document.getElementById('lb-counter');
 var currentIdx = -1;
-/* debounce guard: physics displaces cards into each other's space —
-   when two click events fire in the same frame, only the first wins.  */
-var lbLastOpen = 0;
-
 function updateCounter(){
   lbCounter.textContent = (currentIdx+1) + ' / ' + COUNT;
 }
 
 function openLb(idx){
-  var now = Date.now();
-  if (lb.classList.contains('on') || now - lbLastOpen < 200) return;
-  lbLastOpen = now;
+  if (lb.classList.contains('on')) return;
   currentIdx = idx;
   lbImg.src  = 'images/' + encodeURIComponent(pool[idx]);
   lbFrame.className = 'lb-frame anim-open';
