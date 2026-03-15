@@ -241,8 +241,8 @@ body::after {
       <defs>
         <path id="c" d="M 300,300 m -260,0 a 260,260 0 1,1 520,0 a 260,260 0 1,1 -520,0"/>
       </defs>
-      <text font-family="monospace" font-size="14" fill="#3D3B38" letter-spacing="4.4">
-        <textPath href="#c" startOffset="0%">a new selection every refresh · a new selection every refresh · a new selection every refresh · a new selection every refresh · </textPath>
+      <text font-family="monospace" font-size="14" fill="#3D3B38">
+        <textPath id="orbit-text" href="#c" startOffset="0%">a new selection every refresh · a new selection every refresh · a new selection every refresh · a new selection every refresh · </textPath>
       </text>
     </svg>
   </div>
@@ -639,6 +639,22 @@ window.addEventListener('touchmove', function(e) {
   mx = e.touches[0].clientX; my = e.touches[0].clientY;
 }, {passive: true});
 window.addEventListener('touchend', function() { mx = -9999; my = -9999; });
+
+/* ── orbit: fit text exactly to circumference ──────────────────────────────
+ * getComputedTextLength() returns the real rendered width in SVG user units,
+ * accounting for the actual font metrics in this browser/OS.
+ * letter-spacing = (circumference − naturalWidth) / numChars
+ * numChars = length of the string (spacing is applied after each glyph).
+ * ────────────────────────────────────────────────────────────────────────── */
+(function fitOrbit() {
+  var tp   = document.getElementById('orbit-text');
+  if (!tp) return;
+  var circ = 2 * Math.PI * 260;              /* path radius = 260 SVG units */
+  var nat  = tp.getComputedTextLength();     /* natural width, no extra spacing */
+  var n    = tp.textContent.length;          /* number of glyphs              */
+  var ls   = (circ - nat) / n;
+  tp.parentElement.setAttribute('letter-spacing', ls.toFixed(4));
+})();
 </script>
 </body>
 </html>
