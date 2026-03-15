@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>мудборд</title>
+<title>—</title>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -11,43 +11,27 @@ html, body {
   width: 100%; height: 100%;
   background: #0E0D0C;
   overflow: hidden;
-  cursor: none;
 }
 
-/* custom cursor */
-.cursor {
-  position: fixed; z-index: 9999; pointer-events: none;
-  width: 16px; height: 16px;
-  image-rendering: pixelated;
-  /* pixel arrow drawn as inline SVG via CSS mask */
-  background: #E8E0D4;
-  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 11 16' shape-rendering='crispEdges'%3E%3Crect x='0' y='0' width='2' height='2' fill='%23000'/%3E%3Crect x='0' y='2' width='2' height='2' fill='%23000'/%3E%3Crect x='0' y='4' width='2' height='2' fill='%23000'/%3E%3Crect x='0' y='6' width='2' height='2' fill='%23000'/%3E%3Crect x='0' y='8' width='2' height='2' fill='%23000'/%3E%3Crect x='0' y='10' width='2' height='2' fill='%23000'/%3E%3Crect x='2' y='2' width='2' height='2' fill='%23000'/%3E%3Crect x='2' y='4' width='2' height='2' fill='%23000'/%3E%3Crect x='2' y='6' width='2' height='2' fill='%23000'/%3E%3Crect x='2' y='8' width='2' height='2' fill='%23000'/%3E%3Crect x='4' y='4' width='2' height='2' fill='%23000'/%3E%3Crect x='4' y='6' width='2' height='2' fill='%23000'/%3E%3Crect x='4' y='8' width='2' height='2' fill='%23000'/%3E%3Crect x='6' y='6' width='2' height='2' fill='%23000'/%3E%3Crect x='6' y='8' width='2' height='2' fill='%23000'/%3E%3Crect x='8' y='8' width='2' height='2' fill='%23000'/%3E%3Crect x='6' y='10' width='2' height='2' fill='%23000'/%3E%3Crect x='4' y='10' width='2' height='2' fill='%23000'/%3E%3Crect x='6' y='12' width='2' height='2' fill='%23000'/%3E%3Crect x='4' y='12' width='2' height='2' fill='%23000'/%3E%3Crect x='4' y='14' width='2' height='2' fill='%23000'/%3E%3Crect x='6' y='14' width='2' height='2' fill='%23000'/%3E%3C/svg%3E");
-  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 11 16' shape-rendering='crispEdges'%3E%3Crect x='0' y='0' width='2' height='2' fill='%23000'/%3E%3Crect x='0' y='2' width='2' height='2' fill='%23000'/%3E%3Crect x='0' y='4' width='2' height='2' fill='%23000'/%3E%3Crect x='0' y='6' width='2' height='2' fill='%23000'/%3E%3Crect x='0' y='8' width='2' height='2' fill='%23000'/%3E%3Crect x='0' y='10' width='2' height='2' fill='%23000'/%3E%3Crect x='2' y='2' width='2' height='2' fill='%23000'/%3E%3Crect x='2' y='4' width='2' height='2' fill='%23000'/%3E%3Crect x='2' y='6' width='2' height='2' fill='%23000'/%3E%3Crect x='2' y='8' width='2' height='2' fill='%23000'/%3E%3Crect x='4' y='4' width='2' height='2' fill='%23000'/%3E%3Crect x='4' y='6' width='2' height='2' fill='%23000'/%3E%3Crect x='4' y='8' width='2' height='2' fill='%23000'/%3E%3Crect x='6' y='6' width='2' height='2' fill='%23000'/%3E%3Crect x='6' y='8' width='2' height='2' fill='%23000'/%3E%3Crect x='8' y='8' width='2' height='2' fill='%23000'/%3E%3Crect x='6' y='10' width='2' height='2' fill='%23000'/%3E%3Crect x='4' y='10' width='2' height='2' fill='%23000'/%3E%3Crect x='6' y='12' width='2' height='2' fill='%23000'/%3E%3Crect x='4' y='12' width='2' height='2' fill='%23000'/%3E%3Crect x='4' y='14' width='2' height='2' fill='%23000'/%3E%3Crect x='6' y='14' width='2' height='2' fill='%23000'/%3E%3C/svg%3E");
-  -webkit-mask-size: contain;
-  mask-size: contain;
-  -webkit-mask-repeat: no-repeat;
-  mask-repeat: no-repeat;
-  transform: none;
-  transition: background .12s, width .12s, height .12s;
-}
-.cursor.big {
-  width: 24px; height: 24px;
-  background: #E8E0D4;
-}
-
-/* grid */
+/* grid — no bottom constraint so cards can overflow visually */
 .grid {
-  position: fixed; inset: 0;
+  position: fixed;
+  top: 0; left: 0; right: 0;
   display: grid;
-  /* columns set by JS */
+  overflow: visible;
+  background: #0E0D0C;
+  column-gap: 2px;
+  row-gap: 0;
 }
 
 /* card */
 .card {
   position: relative;
   overflow: hidden;
-  cursor: none;
+  cursor: pointer;
   will-change: transform;
+  border-radius: 10px;
+  /* height + z-index set by JS */
 }
 
 .card img {
@@ -60,8 +44,6 @@ html, body {
   transition: filter .2s;
 }
 
-/* random initial rotation set inline by JS */
-/* glitch flash on hover handled by JS class */
 .card.glitch img {
   filter: contrast(1.3) saturate(0) brightness(1.4);
 }
@@ -71,11 +53,8 @@ body::before {
   content: '';
   position: fixed; inset: 0; z-index: 800; pointer-events: none;
   background: repeating-linear-gradient(
-    0deg,
-    transparent,
-    transparent 2px,
-    rgba(0,0,0,.18) 2px,
-    rgba(0,0,0,.18) 4px
+    0deg, transparent, transparent 2px,
+    rgba(0,0,0,.18) 2px, rgba(0,0,0,.18) 4px
   );
 }
 
@@ -94,121 +73,115 @@ body::after {
   75% { transform: translate(-1px,2px); }
 }
 
-/* gaps between cards — thin dark lines */
-.grid { gap: 2px; background: #0E0D0C; }
+/* entry animation — stagger left→right, top→bottom */
+@keyframes cardIn {
+  from { opacity: 0; transform: var(--init-rot) scale(.94) translateY(6px); }
+  to   { opacity: 1; transform: var(--init-rot) scale(1)   translateY(0);   }
+}
 
-/* lightbox */
+/* ── lightbox ── */
 .lb {
   display: none; position: fixed; inset: 0; z-index: 900;
-  background: rgba(14,13,12,.95);
-  align-items: center; justify-content: center; cursor: none;
+  background: rgba(14,13,12,.96);
+  align-items: center; justify-content: center; cursor: default;
 }
 .lb.on { display: flex; }
+
 .lb-frame {
-  max-width: 88vw; max-height: 88vh;
-  animation: lbIn .28s cubic-bezier(.22,1,.36,1) both;
+  max-width: 82vw; max-height: 86vh;
   position: relative;
+  border-radius: 14px;
+  overflow: hidden;
 }
 .lb-frame img {
-  display: block; max-width: 88vw; max-height: 88vh;
+  display: block;
+  max-width: 82vw; max-height: 86vh;
   object-fit: contain;
   filter: contrast(1.06) saturate(0.85);
+  border-radius: 14px;
 }
-/* red corner accent */
+
+@keyframes lbOpen  { from { opacity:0; transform: scale(.96) skewX(-1deg); } to { opacity:1; transform: scale(1) skewX(0); } }
+@keyframes lbSlideL{ from { opacity:0; transform: translateX(28px)  scale(.97); } to { opacity:1; transform: none; } }
+@keyframes lbSlideR{ from { opacity:0; transform: translateX(-28px) scale(.97); } to { opacity:1; transform: none; } }
+
+.lb-frame.anim-open { animation: lbOpen   .28s cubic-bezier(.22,1,.36,1) both; }
+.lb-frame.anim-l    { animation: lbSlideL .24s cubic-bezier(.22,1,.36,1) both; }
+.lb-frame.anim-r    { animation: lbSlideR .24s cubic-bezier(.22,1,.36,1) both; }
 
 .lb-close {
   position: fixed; top: 1.4rem; right: 1.6rem;
   font-family: monospace; font-size: .75rem;
   letter-spacing: .12em; text-transform: uppercase;
-  color: #555; cursor: none;
+  color: #555; cursor: pointer;
   border: none; background: none;
-  transition: color .18s;
-  z-index: 901;
+  transition: color .18s; z-index: 901;
 }
 .lb-close:hover { color: #ff3c00; }
 
-@keyframes lbIn {
-  from { opacity:0; transform: scale(.96) skewX(-1deg); }
-  to   { opacity:1; transform: scale(1) skewX(0); }
+.lb-arrow {
+  position: fixed; top: 50%; transform: translateY(-50%);
+  font-family: monospace; font-size: 2.6rem; line-height: 1;
+  color: rgba(232,224,212,.2);
+  background: none; border: none; cursor: pointer;
+  padding: 1.2rem 1.4rem;
+  transition: color .18s; z-index: 902;
+  user-select: none;
+}
+.lb-arrow:hover { color: rgba(232,224,212,.8); }
+.lb-arrow-l { left:  .5rem; }
+.lb-arrow-r { right: .5rem; }
+
+.lb-counter {
+  position: fixed; bottom: 1.4rem; left: 50%;
+  transform: translateX(-50%);
+  font-family: monospace; font-size: .68rem;
+  letter-spacing: .14em; color: #3a3a3a;
+  z-index: 902; pointer-events: none;
 }
 
-/* entry animation */
-@keyframes cardIn {
-  from { opacity: 0; transform: var(--init-rot) scale(.88); }
-  to   { opacity: 1; transform: var(--init-rot) scale(1); }
-}
-@media (hover: none) {
-  .cursor { display: none; }
-  html, body { cursor: auto; }
-  .card { cursor: pointer; }
-  .lb { cursor: auto; }
-}
+/* ── welcome ── */
 .welcome {
   position: fixed; inset: 0; z-index: 980;
   background: rgba(14,13,12,.92);
   display: flex; align-items: center; justify-content: center;
-  cursor: none;
+  cursor: default;
   animation: wFadeIn .6s ease both;
 }
-.welcome.hidden {
-  animation: wFadeOut .5s ease both;
-  pointer-events: none;
-}
+.welcome.hidden { animation: wFadeOut .5s ease both; pointer-events: none; }
 .welcome-text {
   font-family: monospace;
   font-size: clamp(.9rem, 1.8vw, 1.2rem);
-  line-height: 1.9;
-  color: #E8E0D4;
-  letter-spacing: .04em;
-  text-align: center;
-  max-width: 520px;
-  padding: 0 2rem;
+  line-height: 1.9; color: #E8E0D4;
+  letter-spacing: .04em; text-align: center;
+  max-width: 520px; padding: 0 2rem;
 }
-
 .welcome-text span {
-  display: block;
-  margin-top: 2rem;
-  font-size: .72rem;
-  letter-spacing: .14em;
-  color: #555;
+  display: block; margin-top: 2rem;
+  font-size: .72rem; letter-spacing: .14em; color: #555;
   animation: hint 3.2s ease-in-out infinite;
 }
-@keyframes hint {
-  0%   { opacity: 0; }
-  30%  { opacity: 1; }
-  70%  { opacity: 1; }
-  100% { opacity: 0; }
-}
+@keyframes hint { 0%,100%{opacity:0;} 30%,70%{opacity:1;} }
 .orbit-wrap {
-  position: absolute; inset: 0;
-  pointer-events: none;
+  position: absolute; inset: 0; pointer-events: none;
   display: flex; align-items: center; justify-content: center;
 }
 .orbit-svg {
-  width: min(80vw, 80vh); height: min(80vw, 80vh);
-  animation: spinOrbit 22s linear infinite;
-  opacity: .55;
+  width: min(80vw,80vh); height: min(80vw,80vh);
+  animation: spinOrbit 22s linear infinite; opacity: .55;
 }
-@media (max-width: 700px) {
-  .orbit-svg { width: 80vw; height: 80vw; }
-  .welcome-text { font-size: clamp(.9rem, 1.8vw, 1.2rem); }
-  .welcome-text span { font-size: .72rem; }
-}
-@keyframes spinOrbit {
-  from { transform: rotate(0deg); }
-  to   { transform: rotate(360deg); }
-}
-@keyframes wFadeIn {
-  from { opacity: 0; } to { opacity: 1; }
-}
-@keyframes wFadeOut {
-  from { opacity: 1; } to { opacity: 0; }
+@keyframes spinOrbit { to { transform: rotate(360deg); } }
+@keyframes wFadeIn  { from{opacity:0;} to{opacity:1;} }
+@keyframes wFadeOut { from{opacity:1;} to{opacity:0;} }
+
+@media (max-width:700px) {
+  .orbit-svg { width:80vw; height:80vw; }
+  .lb-arrow  { font-size:2rem; padding:.8rem 1rem; }
 }
 </style>
 </head>
 <body>
 
-<div class="cursor" id="cursor"></div>
 <div class="welcome" id="welcome">
   <div class="welcome-text">
     привет! ты попал в мой мудборд,<br>
@@ -231,8 +204,11 @@ body::after {
 <div class="grid" id="grid"></div>
 
 <div class="lb" id="lb">
-  <button class="lb-close" id="lb-close">[ закрыть ]</button>
-  <div class="lb-frame"><img id="lb-img" src="" alt="" /></div>
+  <button class="lb-close"        id="lb-close">[ закрыть ]</button>
+  <button class="lb-arrow lb-arrow-l" id="lb-prev">&#8249;</button>
+  <button class="lb-arrow lb-arrow-r" id="lb-next">&#8250;</button>
+  <div class="lb-frame anim-open" id="lb-frame"><img id="lb-img" src="" alt="" /></div>
+  <div class="lb-counter" id="lb-counter"></div>
 </div>
 
 <script>
@@ -307,164 +283,211 @@ var ALL = [
   "outfit inspo.jpg",
 ];
 
-function shuffle(a){ return a.slice().sort(function(){return Math.random()-.5;}); }
-function rnd(a,b){ return a + Math.random()*(b-a); }
+function shuffle(a){ return a.slice().sort(function(){ return Math.random()-.5; }); }
 
-/* ── grid setup ── */
+/* ── dimensions ── */
+var VH   = window.innerHeight;
 var COLS = window.innerWidth < 700 ? 3 : window.innerWidth < 1100 ? 5 : 7;
 var ROWS = Math.ceil(36 / COLS);
 var COUNT = COLS * ROWS;
 
+/*
+ * Solitaire layout:
+ *   rowHeight  = VH / (ROWS + 2)      — the "header strip" visible per card
+ *   cardHeight = rowHeight * 3         — full card height
+ *
+ *   Later rows have higher z-index → they cover the body of earlier rows,
+ *   leaving only each card's top header strip exposed.
+ *
+ *   Proof the last row ends at exactly VH:
+ *   (ROWS-1)*rowHeight + cardHeight = (ROWS-1+3)*rowHeight = (ROWS+2)*rowHeight = VH ✓
+ */
+var rowHeight  = VH / (ROWS + 2);
+var cardHeight = rowHeight * 3;
+
 var grid = document.getElementById('grid');
-grid.style.gridTemplateColumns = 'repeat('+COLS+',1fr)';
-grid.style.gridTemplateRows    = 'repeat('+ROWS+',1fr)';
+grid.style.gridTemplateColumns = 'repeat(' + COLS + ', 1fr)';
+grid.style.gridTemplateRows    = 'repeat(' + ROWS + ', ' + rowHeight.toFixed(2) + 'px)';
 
 var pool = shuffle(ALL);
-while(pool.length < COUNT) pool = pool.concat(shuffle(ALL));
+while (pool.length < COUNT) pool = pool.concat(shuffle(ALL));
 pool = pool.slice(0, COUNT);
 
-/* each card gets a random base rotation — the punk chaos */
 var ROTS = [-8,-6,-5,-4,-3,-2,-1,0,1,2,3,4,5,6,8];
+
+/*
+ * Animation stagger: each row starts only after the previous row finishes.
+ *   duration  = 0.20s
+ *   colStep   = 0.026s per column
+ *   rowStep   = (COLS-1)*colStep + duration + 0.055s buffer
+ */
+var DUR      = 0.20;
+var COL_STEP = 0.026;
+var ROW_STEP = (COLS - 1) * COL_STEP + DUR + 0.055;
 
 var cards = [];
 
-pool.forEach(function(file, i){
-  var rot = ROTS[Math.floor(Math.random()*ROTS.length)];
+pool.forEach(function(file, i) {
+  var row = Math.floor(i / COLS);
+  var col = i % COLS;
+  var rot = ROTS[Math.floor(Math.random() * ROTS.length)];
 
   var card = document.createElement('div');
   card.className = 'card';
-  card.style.setProperty('--init-rot','rotate('+rot+'deg)');
-
-  /* stagger entry */
-  card.style.animation = 'cardIn .5s '+(i*0.012).toFixed(3)+'s cubic-bezier(.22,1,.36,1) both';
+  card.style.setProperty('--init-rot', 'rotate(' + rot + 'deg)');
+  card.style.height  = cardHeight.toFixed(2) + 'px';
+  /* Higher rows have higher z-index → cover body of row above */
+  card.style.zIndex  = (row + 1) * 2;
+  card.style.animation =
+    'cardIn ' + DUR + 's ' +
+    (row * ROW_STEP + col * COL_STEP).toFixed(3) + 's ' +
+    'cubic-bezier(.22,1,.36,1) both';
 
   var img = document.createElement('img');
-  img.src = 'images/' + encodeURIComponent(file);
-  img.loading = i < COLS*2 ? 'eager' : 'lazy';
-  img.onerror = function(){ card.style.background='#1a1815'; };
+  img.src     = 'images/' + encodeURIComponent(file);
+  img.loading = i < COLS * 2 ? 'eager' : 'lazy';
+  img.onerror = function() { card.style.background = '#1a1815'; };
 
   card.appendChild(img);
   grid.appendChild(card);
 
   cards.push({
-    el:    card,
-    img:   img,
-    file:  file,
-    baseRot: rot,
-    /* interpolated state */
+    el: card, file: file, row: row, baseRot: rot,
     tx:0, ty:0, rz:rot, sc:1,
-    /* targets */
     ttx:0, tty:0, trz:rot, tsc:1,
   });
 
-  /* lightbox open */
-  card.addEventListener('click', function(){
-    document.getElementById('lb-img').src = 'images/'+encodeURIComponent(file);
-    document.getElementById('lb').classList.add('on');
-  });
+  card.addEventListener('click', function() { openLb(i); });
 });
 
-/* ── cursor ── */
-var cursorEl = document.getElementById('cursor');
+/* ── physics ── */
+var REPEL_R = 240, REPEL_F = 70, TILT = 18, LERP = 0.09;
 var mx = -9999, my = -9999;
-
-window.addEventListener('mousemove', function(e){
-  mx = e.clientX; my = e.clientY;
-  cursorEl.style.left = (mx+1)+'px';
-  cursorEl.style.top  = (my+1)+'px';
-});
-window.addEventListener('mouseleave', function(){ mx=-9999; my=-9999; });
-
-/* ── physics params ── */
-var REPEL_R  = 240;
-var REPEL_F  = 70;
-var TILT     = 18;
-var LERP     = 0.09;
 
 function lerp(a,b,t){ return a+(b-a)*t; }
 
-/* ── random glitch on cards ── */
+window.addEventListener('mousemove', function(e){ mx=e.clientX; my=e.clientY; });
+window.addEventListener('mouseleave', function(){ mx=-9999; my=-9999; });
+
 setInterval(function(){
-  if(Math.random() > 0.7) return;
+  if (Math.random() > 0.7) return;
   var c = cards[Math.floor(Math.random()*cards.length)];
   c.el.classList.add('glitch');
   setTimeout(function(){ c.el.classList.remove('glitch'); }, 80 + Math.random()*120);
 }, 400);
 
-/* ── animation loop ── */
 function tick(){
   requestAnimationFrame(tick);
-
   cards.forEach(function(c){
     var rect = c.el.getBoundingClientRect();
     var cx = rect.left + rect.width/2;
     var cy = rect.top  + rect.height/2;
-    var dx = cx - mx, dy = cy - my;
+    var dx = cx-mx, dy = cy-my;
     var dist = Math.sqrt(dx*dx+dy*dy);
 
-    if(dist < REPEL_R && dist > 0){
+    if (dist < REPEL_R && dist > 0){
       var str  = 1 - dist/REPEL_R;
       var push = str * REPEL_F;
-      c.ttx  = (dx/dist)*push;
-      c.tty  = (dy/dist)*push;
-      /* chaotic: rotation swings harder */
-      c.trz  = c.baseRot + (dx/dist)*TILT*str*1.4;
-      c.tsc  = 1 + 0.08*str;
-      cursorEl.classList.add('big');
+      c.ttx = (dx/dist)*push;
+      c.tty = (dy/dist)*push;
+      c.trz = c.baseRot + (dx/dist)*TILT*str*1.4;
+      c.tsc = 1 + 0.08*str;
     } else {
-      c.ttx = 0; c.tty = 0;
-      c.trz = c.baseRot; c.tsc = 1;
-      cursorEl.classList.remove('big');
+      c.ttx=0; c.tty=0; c.trz=c.baseRot; c.tsc=1;
     }
 
-    c.tx  = lerp(c.tx,  c.ttx, LERP);
-    c.ty  = lerp(c.ty,  c.tty, LERP);
-    c.rz  = lerp(c.rz,  c.trz, LERP);
-    c.sc  = lerp(c.sc,  c.tsc, LERP);
+    c.tx = lerp(c.tx, c.ttx, LERP);
+    c.ty = lerp(c.ty, c.tty, LERP);
+    c.rz = lerp(c.rz, c.trz, LERP);
+    c.sc = lerp(c.sc, c.tsc, LERP);
 
     c.el.style.transform =
       'translate('+c.tx.toFixed(1)+'px,'+c.ty.toFixed(1)+'px)'+
       ' rotate('+c.rz.toFixed(2)+'deg)'+
       ' scale('+c.sc.toFixed(3)+')';
 
-    /* z-index: displaced cards come forward */
     var d = Math.abs(c.tx)+Math.abs(c.ty);
-    c.el.style.zIndex = d > 2 ? 10 : 1;
+    c.el.style.zIndex = d > 2 ? (c.row+1)*2+50 : (c.row+1)*2;
   });
 }
 tick();
 
-/* ── welcome screen ── */
+/* ── lightbox ── */
+var lb        = document.getElementById('lb');
+var lbFrame   = document.getElementById('lb-frame');
+var lbImg     = document.getElementById('lb-img');
+var lbCounter = document.getElementById('lb-counter');
+var currentIdx = -1;
+
+function updateCounter(){
+  lbCounter.textContent = (currentIdx+1) + ' / ' + COUNT;
+}
+
+function openLb(idx){
+  currentIdx = idx;
+  lbImg.src  = 'images/' + encodeURIComponent(pool[idx]);
+  lbFrame.className = 'lb-frame anim-open';
+  lb.classList.add('on');
+  updateCounter();
+}
+
+function lbNavigate(dir){
+  currentIdx = (currentIdx + dir + COUNT) % COUNT;
+  lbFrame.className = 'lb-frame';
+  void lbFrame.offsetWidth; /* reflow to restart animation */
+  lbFrame.className = 'lb-frame ' + (dir > 0 ? 'anim-l' : 'anim-r');
+  lbImg.src = 'images/' + encodeURIComponent(pool[currentIdx]);
+  updateCounter();
+}
+
+function closeLb(){
+  lb.classList.remove('on');
+  setTimeout(function(){ lbImg.src=''; }, 300);
+}
+
+lb.addEventListener('click', function(e){ if(e.target===lb) closeLb(); });
+document.getElementById('lb-close').addEventListener('click', closeLb);
+document.getElementById('lb-prev').addEventListener('click', function(e){
+  e.stopPropagation(); lbNavigate(-1);
+});
+document.getElementById('lb-next').addEventListener('click', function(e){
+  e.stopPropagation(); lbNavigate(1);
+});
+
+/* keyboard */
+document.addEventListener('keydown', function(e){
+  if (!lb.classList.contains('on')) return;
+  if (e.key === 'ArrowLeft')  lbNavigate(-1);
+  if (e.key === 'ArrowRight') lbNavigate(1);
+  if (e.key === 'Escape')     closeLb();
+});
+
+/* swipe */
+var swipeX = 0;
+lb.addEventListener('touchstart', function(e){ swipeX = e.touches[0].clientX; }, {passive:true});
+lb.addEventListener('touchend',   function(e){
+  var dx = e.changedTouches[0].clientX - swipeX;
+  if (Math.abs(dx) > 48) lbNavigate(dx < 0 ? 1 : -1);
+});
+
+/* ── welcome ── */
 var welcome = document.getElementById('welcome');
 if (localStorage.getItem('mb_seen')) {
   welcome.style.display = 'none';
 } else {
-  document.addEventListener('click', function dismissWelcome() {
-    localStorage.setItem('mb_seen', '1');
+  document.addEventListener('click', function dismiss(){
+    localStorage.setItem('mb_seen','1');
     welcome.classList.add('hidden');
-    setTimeout(function(){ welcome.style.display = 'none'; }, 520);
-    document.removeEventListener('click', dismissWelcome);
+    setTimeout(function(){ welcome.style.display='none'; }, 520);
+    document.removeEventListener('click', dismiss);
   });
 }
 
-/* ── touch ── */
-window.addEventListener('touchmove',function(e){
+/* touch repel */
+window.addEventListener('touchmove', function(e){
   mx=e.touches[0].clientX; my=e.touches[0].clientY;
-},{passive:true});
-window.addEventListener('touchend',function(){ mx=-9999; my=-9999; });
-
-/* ── lightbox close ── */
-var lb = document.getElementById('lb');
-lb.addEventListener('click',function(e){
-  if(e.target===lb) closeLb();
-});
-document.getElementById('lb-close').addEventListener('click', closeLb);
-document.addEventListener('keydown',function(e){ if(e.key==='Escape') closeLb(); });
-
-function closeLb(){
-  lb.classList.remove('on');
-  setTimeout(function(){ document.getElementById('lb-img').src=''; },300);
-}
+}, {passive:true});
+window.addEventListener('touchend', function(){ mx=-9999; my=-9999; });
 </script>
 </body>
 </html>
