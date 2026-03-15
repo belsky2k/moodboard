@@ -46,8 +46,31 @@ html, body {
   opacity: 0; /* fades in once loaded — see img.onload in JS */
 }
 
-.card.glitch img {
-  filter: contrast(1.3) saturate(0) brightness(1.4);
+/* shine sweep — pseudo-element slides diagonally across the card */
+.card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    118deg,
+    transparent           30%,
+    rgba(255,255,255,.13) 48%,
+    rgba(255,255,255,.22) 52%,
+    transparent           68%
+  );
+  transform: translateX(-130%);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 2;
+}
+.card.shine::after {
+  animation: shineSweep .9s cubic-bezier(.4,0,.2,1) forwards;
+}
+@keyframes shineSweep {
+  0%   { transform: translateX(-130%); opacity: 1; }
+  60%  { opacity: 1; }
+  100% { transform: translateX(130%);  opacity: 0; }
 }
 
 /* scan-line overlay */
@@ -450,9 +473,11 @@ grid.addEventListener('mouseleave', function() { hoveredCard = null; });
 setInterval(function() {
   if (Math.random() > 0.7) return;
   var c = cards[Math.floor(Math.random() * cards.length)];
-  c.el.classList.add('glitch');
-  setTimeout(function() { c.el.classList.remove('glitch'); }, 80 + Math.random() * 120);
-}, 400);
+  if (!c.ready || c.el.classList.contains('shine')) return;
+  c.el.classList.add('shine');
+  /* remove after animation completes so it can fire again */
+  setTimeout(function() { c.el.classList.remove('shine'); }, 950);
+}, 1800);
 
 function tick() {
   requestAnimationFrame(tick);
