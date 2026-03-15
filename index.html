@@ -196,10 +196,6 @@ body::after {
 @keyframes wFadeOut { from{opacity:1;} to{opacity:0;} }
 
 @media (max-width:700px) {
-  /* On portrait mobile min(80vw,80vh)=80vw can be smaller than the text block.
-     Use max(100vw,100vh) so the orbit is always the viewport's LONGER side:
-       portrait 375×667 → 667px → orbit ⌀≈578px > text ≈311px ✓
-       landscape 667×375 → same 667px ✓                                      */
   .orbit-svg {
     width:  max(100vw, 100vh);
     height: max(100vw, 100vh);
@@ -310,7 +306,15 @@ var ALL = [
   "outfit inspo.jpg",
 ];
 
-function shuffle(a){ return a.slice().sort(function(){ return Math.random()-.5; }); }
+/* ── FIX 1: Fisher-Yates shuffle (replaces biased sort-based shuffle) ── */
+function shuffle(a) {
+  var b = a.slice();
+  for (var i = b.length - 1; i > 0; i--) {
+    var j = Math.floor(Math.random() * (i + 1));
+    var t = b[i]; b[i] = b[j]; b[j] = t;
+  }
+  return b;
+}
 
 /* ── dimensions ── */
 var VH   = window.innerHeight;
@@ -318,17 +322,6 @@ var COLS = window.innerWidth < 700 ? 3 : window.innerWidth < 1100 ? 5 : 7;
 var ROWS = Math.ceil(36 / COLS);
 var COUNT = COLS * ROWS;
 
-/*
- * Solitaire layout:
- *   rowHeight  = VH / (ROWS + 2)      — the "header strip" visible per card
- *   cardHeight = rowHeight * 3         — full card height
- *
- *   Later rows have higher z-index → they cover the body of earlier rows,
- *   leaving only each card's top header strip exposed.
- *
- *   Proof the last row ends at exactly VH:
- *   (ROWS-1)*rowHeight + cardHeight = (ROWS-1+3)*rowHeight = (ROWS+2)*rowHeight = VH ✓
- */
 var rowHeight  = VH / (ROWS + 2);
 var cardHeight = rowHeight * 3;
 
@@ -336,21 +329,24 @@ var grid = document.getElementById('grid');
 grid.style.gridTemplateColumns = 'repeat(' + COLS + ', 1fr)';
 grid.style.gridTemplateRows    = 'repeat(' + ROWS + ', ' + rowHeight.toFixed(2) + 'px)';
 
-var pool = shuffle(ALL);
+/* ── FIX 2: Pool fill without intermediate array churn ── */
+var pool = [];
 while (pool.length < COUNT) pool = pool.concat(shuffle(ALL));
 pool = pool.slice(0, COUNT);
 
 var ROTS = [-8,-6,-5,-4,-3,-2,-1,0,1,2,3,4,5,6,8];
 
-/*
- * Animation stagger: each row starts only after the previous row finishes.
- *   duration  = 0.20s
- *   colStep   = 0.026s per column
- *   rowStep   = (COLS-1)*colStep + duration + 0.055s buffer
- */
 var DUR      = 0.20;
 var COL_STEP = 0.026;
 var ROW_STEP = (COLS - 1) * COL_STEP + DUR + 0.055;
+
+/* ── FIX 3: Lightbox elements declared here so grid click handler
+            can reference them without relying on var-hoisting ── */
+var lb        = document.getElementById('lb');
+var lbFrame   = document.getElementById('lb-frame');
+var lbImg     = document.getElementById('lb-img');
+var lbCounter = document.getElementById('lb-counter');
+var currentIdx = -1;
 
 var cards = [];
 
@@ -363,7 +359,6 @@ pool.forEach(function(file, i) {
   card.className = 'card';
   card.style.setProperty('--init-rot', 'rotate(' + rot + 'deg)');
   card.style.height  = cardHeight.toFixed(2) + 'px';
-  /* Higher rows have higher z-index → cover body of row above */
   card.style.zIndex  = (row + 1) * 2;
   card.style.animation =
     'cardIn ' + DUR + 's ' +
@@ -382,56 +377,65 @@ pool.forEach(function(file, i) {
     el: card, file: file, row: row, baseRot: rot,
     tx:0, ty:0, rz:rot, sc:1,
     ttx:0, tty:0, trz:rot, tsc:1,
-    /* ready becomes true after the CSS entry animation ends.
-       The tick loop skips cards that are still animating so it
-       never writes style.transform over @keyframes cardIn.      */
+    /* restCx/restCy: center of the card at rest (no physics offset).
+       Captured once in animationend — eliminates getBoundingClientRect
+       from the hot tick loop entirely.                                  */
+    restCx: 0, restCy: 0,
     ready: false,
   };
-  card.addEventListener('animationend', function() { c.ready = true; });
-  cards.push(c);
 
-  /* no per-card click — handled by the grid click below
-     so cursor grid-position drives the target, not DOM hit-test */
+  /* ── FIX 4: Store pool index directly on element for O(1) click lookup ── */
+  card._poolIdx = i;
+
+  card.addEventListener('animationend', function() {
+    /* Cache rest-center once, right after the entry animation settles.
+       getBoundingClientRect here is free — called only once per card.   */
+    var rect = card.getBoundingClientRect();
+    c.restCx = rect.left + rect.width  / 2;
+    c.restCy = rect.top  + rect.height / 2;
+    c.ready = true;
+  });
+
+  cards.push(c);
 });
 
 /* ── physics ── */
 var REPEL_R = 240, REPEL_F = 70, TILT = 18, LERP = 0.09;
 var mx = -9999, my = -9999;
 
-function lerp(a,b,t){ return a+(b-a)*t; }
+function lerp(a, b, t) { return a + (b - a) * t; }
 
-window.addEventListener('mousemove', function(e){ mx=e.clientX; my=e.clientY; });
-window.addEventListener('mouseleave', function(){ mx=-9999; my=-9999; });
+window.addEventListener('mousemove', function(e) { mx = e.clientX; my = e.clientY; });
+window.addEventListener('mouseleave', function()  { mx = -9999; my = -9999; });
 
-setInterval(function(){
+setInterval(function() {
   if (Math.random() > 0.7) return;
-  var c = cards[Math.floor(Math.random()*cards.length)];
+  var c = cards[Math.floor(Math.random() * cards.length)];
   c.el.classList.add('glitch');
-  setTimeout(function(){ c.el.classList.remove('glitch'); }, 80 + Math.random()*120);
+  setTimeout(function() { c.el.classList.remove('glitch'); }, 80 + Math.random() * 120);
 }, 400);
 
-function tick(){
+function tick() {
   requestAnimationFrame(tick);
-  cards.forEach(function(c){
-    /* Skip cards still in their entry animation — writing style.transform
-       here would override @keyframes cardIn and break the stagger.       */
+  cards.forEach(function(c) {
     if (!c.ready) return;
 
-    var rect = c.el.getBoundingClientRect();
-    var cx = rect.left + rect.width/2;
-    var cy = rect.top  + rect.height/2;
-    var dx = cx-mx, dy = cy-my;
-    var dist = Math.sqrt(dx*dx+dy*dy);
+    /* ── FIX 5: Use cached rest-center + current offset instead of
+                getBoundingClientRect() on every frame ── */
+    var cx = c.restCx + c.tx;
+    var cy = c.restCy + c.ty;
+    var dx = cx - mx, dy = cy - my;
+    var dist = Math.sqrt(dx * dx + dy * dy);
 
-    if (dist < REPEL_R && dist > 0){
-      var str  = 1 - dist/REPEL_R;
+    if (dist < REPEL_R && dist > 0) {
+      var str  = 1 - dist / REPEL_R;
       var push = str * REPEL_F;
-      c.ttx = (dx/dist)*push;
-      c.tty = (dy/dist)*push;
-      c.trz = c.baseRot + (dx/dist)*TILT*str*1.4;
-      c.tsc = 1 + 0.08*str;
+      c.ttx = (dx / dist) * push;
+      c.tty = (dy / dist) * push;
+      c.trz = c.baseRot + (dx / dist) * TILT * str * 1.4;
+      c.tsc = 1 + 0.08 * str;
     } else {
-      c.ttx=0; c.tty=0; c.trz=c.baseRot; c.tsc=1;
+      c.ttx = 0; c.tty = 0; c.trz = c.baseRot; c.tsc = 1;
     }
 
     c.tx = lerp(c.tx, c.ttx, LERP);
@@ -440,49 +444,31 @@ function tick(){
     c.sc = lerp(c.sc, c.tsc, LERP);
 
     c.el.style.transform =
-      'translate('+c.tx.toFixed(1)+'px,'+c.ty.toFixed(1)+'px)'+
-      ' rotate('+c.rz.toFixed(2)+'deg)'+
-      ' scale('+c.sc.toFixed(3)+')';
+      'translate(' + c.tx.toFixed(1) + 'px,' + c.ty.toFixed(1) + 'px)' +
+      ' rotate(' + c.rz.toFixed(2) + 'deg)' +
+      ' scale(' + c.sc.toFixed(3) + ')';
 
-    var d = Math.abs(c.tx)+Math.abs(c.ty);
-    c.el.style.zIndex = d > 2 ? (c.row+1)*2+50 : (c.row+1)*2;
+    var d = Math.abs(c.tx) + Math.abs(c.ty);
+    c.el.style.zIndex = d > 2 ? (c.row + 1) * 2 + 50 : (c.row + 1) * 2;
   });
 }
 tick();
 
-/* ── grid click: determine card by cursor grid-position ────────────────────
- *  Physics repel moves cards visually. If we relied on DOM event.target the
- *  displaced card (which moved away) would never match the cursor position.
- *  Instead: map the raw click coordinates to the solitaire grid cell.
- *
- *  Visible area of each card (except last row) = top rowHeight strip.
- *  col = floor(x / colWidth),  row = floor(y / rowHeight)
- *  → directly identifies which card header was tapped/clicked.
- * ─────────────────────────────────────────────────────────────────────────── */
-var VW_live = window.innerWidth; /* may differ from VW after orientation change */
+/* ── grid click ── */
 grid.addEventListener('click', function(e) {
   if (lb.classList.contains('on')) return;
-  var colWidth = VW_live / COLS;
-  var col = Math.floor(e.clientX / colWidth);
-  var row = Math.floor(e.clientY / rowHeight);
-  col = Math.max(0, Math.min(COLS - 1, col));
-  row = Math.max(0, Math.min(ROWS - 1, row));
-  var idx = row * COLS + col;
-  if (idx >= 0 && idx < COUNT) openLb(idx);
+  var cardEl = e.target.closest('.card');
+  if (!cardEl) return;
+  /* ── FIX 4 (cont): O(1) index read instead of findIndex O(n) ── */
+  openLb(cardEl._poolIdx);
 });
-window.addEventListener('resize', function() { VW_live = window.innerWidth; });
 
 /* ── lightbox ── */
-var lb        = document.getElementById('lb');
-var lbFrame   = document.getElementById('lb-frame');
-var lbImg     = document.getElementById('lb-img');
-var lbCounter = document.getElementById('lb-counter');
-var currentIdx = -1;
-function updateCounter(){
-  lbCounter.textContent = (currentIdx+1) + ' / ' + COUNT;
+function updateCounter() {
+  lbCounter.textContent = (currentIdx + 1) + ' / ' + COUNT;
 }
 
-function openLb(idx){
+function openLb(idx) {
   if (lb.classList.contains('on')) return;
   currentIdx = idx;
   lbImg.src  = 'images/' + encodeURIComponent(pool[idx]);
@@ -491,7 +477,7 @@ function openLb(idx){
   updateCounter();
 }
 
-function lbNavigate(dir){
+function lbNavigate(dir) {
   currentIdx = (currentIdx + dir + COUNT) % COUNT;
   lbFrame.className = 'lb-frame';
   void lbFrame.offsetWidth; /* reflow to restart animation */
@@ -500,22 +486,22 @@ function lbNavigate(dir){
   updateCounter();
 }
 
-function closeLb(){
+function closeLb() {
   lb.classList.remove('on');
-  setTimeout(function(){ lbImg.src=''; }, 300);
+  setTimeout(function() { lbImg.src = ''; }, 300);
 }
 
-lb.addEventListener('click', function(e){ if(e.target===lb) closeLb(); });
+lb.addEventListener('click', function(e) { if (e.target === lb) closeLb(); });
 document.getElementById('lb-close').addEventListener('click', closeLb);
-document.getElementById('lb-prev').addEventListener('click', function(e){
+document.getElementById('lb-prev').addEventListener('click', function(e) {
   e.stopPropagation(); lbNavigate(-1);
 });
-document.getElementById('lb-next').addEventListener('click', function(e){
+document.getElementById('lb-next').addEventListener('click', function(e) {
   e.stopPropagation(); lbNavigate(1);
 });
 
 /* keyboard */
-document.addEventListener('keydown', function(e){
+document.addEventListener('keydown', function(e) {
   if (!lb.classList.contains('on')) return;
   if (e.key === 'ArrowLeft')  lbNavigate(-1);
   if (e.key === 'ArrowRight') lbNavigate(1);
@@ -524,8 +510,8 @@ document.addEventListener('keydown', function(e){
 
 /* swipe */
 var swipeX = 0;
-lb.addEventListener('touchstart', function(e){ swipeX = e.touches[0].clientX; }, {passive:true});
-lb.addEventListener('touchend',   function(e){
+lb.addEventListener('touchstart', function(e) { swipeX = e.touches[0].clientX; }, {passive: true});
+lb.addEventListener('touchend',   function(e) {
   var dx = e.changedTouches[0].clientX - swipeX;
   if (Math.abs(dx) > 48) lbNavigate(dx < 0 ? 1 : -1);
 });
@@ -535,19 +521,19 @@ var welcome = document.getElementById('welcome');
 if (localStorage.getItem('mb_seen')) {
   welcome.style.display = 'none';
 } else {
-  document.addEventListener('click', function dismiss(){
-    localStorage.setItem('mb_seen','1');
+  document.addEventListener('click', function dismiss() {
+    localStorage.setItem('mb_seen', '1');
     welcome.classList.add('hidden');
-    setTimeout(function(){ welcome.style.display='none'; }, 520);
+    setTimeout(function() { welcome.style.display = 'none'; }, 520);
     document.removeEventListener('click', dismiss);
   });
 }
 
 /* touch repel */
-window.addEventListener('touchmove', function(e){
-  mx=e.touches[0].clientX; my=e.touches[0].clientY;
-}, {passive:true});
-window.addEventListener('touchend', function(){ mx=-9999; my=-9999; });
+window.addEventListener('touchmove', function(e) {
+  mx = e.touches[0].clientX; my = e.touches[0].clientY;
+}, {passive: true});
+window.addEventListener('touchend', function() { mx = -9999; my = -9999; });
 </script>
 </body>
 </html>
