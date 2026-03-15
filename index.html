@@ -448,16 +448,25 @@ function spring(cur, vel, target, k, d) {
 
 /* Currently hovered card data object (null = none) */
 var hoveredCard = null;
+var hoverTimer  = null;
 
 window.addEventListener('mousemove', function(e) { mx = e.clientX; my = e.clientY; });
-window.addEventListener('mouseleave', function()  { mx = -9999; my = -9999; });
+window.addEventListener('mouseleave', function()  { mx = -9999; my = -9999; clearTimeout(hoverTimer); hoveredCard = null; });
 
-/* Track exactly which card is under the cursor — no radius, no neighbours */
+/* Debounce: card only activates if cursor stays on it for 60 ms.
+   Fast sweeps skip the pop entirely — no flicker between cards. */
 grid.addEventListener('mouseover', function(e) {
   var cardEl = e.target.closest('.card');
-  hoveredCard = (cardEl && cardEl._poolIdx !== undefined) ? cards[cardEl._poolIdx] : null;
+  var next   = (cardEl && cardEl._poolIdx !== undefined) ? cards[cardEl._poolIdx] : null;
+  if (next === hoveredCard) return;
+  clearTimeout(hoverTimer);
+  if (next) {
+    hoverTimer = setTimeout(function() { hoveredCard = next; }, 60);
+  } else {
+    hoveredCard = null;
+  }
 });
-grid.addEventListener('mouseleave', function() { hoveredCard = null; });
+grid.addEventListener('mouseleave', function() { clearTimeout(hoverTimer); hoveredCard = null; });
 
 /*
  * Shine burst:
