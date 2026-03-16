@@ -14,7 +14,6 @@ html, body {
   overflow: hidden;
 }
 
-/* grid — no bottom constraint so cards can overflow visually */
 .grid {
   position: fixed;
   top: 0; left: 0; right: 0;
@@ -25,7 +24,6 @@ html, body {
   row-gap: 0;
 }
 
-/* card */
 .card {
   position: relative;
   overflow: hidden;
@@ -44,7 +42,6 @@ html, body {
   transition: filter .2s;
 }
 
-/* shine sweep — pseudo-element slides diagonally across the card */
 .card::after {
   content: '';
   position: absolute;
@@ -71,7 +68,6 @@ html, body {
   100% { transform: translateX(130%);  opacity: 0; }
 }
 
-/* scan-line overlay */
 body::before {
   content: '';
   position: fixed; inset: 0; z-index: 800; pointer-events: none;
@@ -81,7 +77,6 @@ body::before {
   );
 }
 
-/* grain */
 body::after {
   content: '';
   position: fixed; inset: 0; z-index: 801; pointer-events: none;
@@ -96,17 +91,14 @@ body::after {
   75% { transform: translate(-1px,2px); }
 }
 
-/* entry animation — stagger left→right, top→bottom */
 @keyframes cardIn {
   from { opacity: 0; transform: var(--init-rot) scale(.94) translateY(6px); }
   to   { opacity: 1; transform: var(--init-rot) scale(1)   translateY(0);   }
 }
 
-/* ── lightbox ── */
 .lb {
   display: none; position: fixed; inset: 0; z-index: 900;
   background: rgba(14,13,12,.96);
-  /* safe zones for UI controls, plus device notch/home-bar */
   padding-top:    max(3.2rem, env(safe-area-inset-top,    0px));
   padding-bottom: max(2.4rem, env(safe-area-inset-bottom, 0px));
   padding-left:   max(3.2rem, env(safe-area-inset-left,   0px));
@@ -118,15 +110,12 @@ body::after {
 .lb-frame {
   position: relative;
   display: flex; align-items: center; justify-content: center;
-  /* shrink to fit image — no fixed size */
   max-width: 100%; max-height: 100%;
   border-radius: 14px; overflow: hidden;
 }
 .lb-frame img {
   display: block;
-  /* auto dimensions — browser sizes naturally to original aspect ratio */
   width: auto; height: auto;
-  /* never exceed the safe viewport area */
   max-width:  100%;
   max-height: 100%;
   object-fit: contain;
@@ -173,7 +162,6 @@ body::after {
   z-index: 902; pointer-events: none;
 }
 
-/* ── welcome ── */
 .welcome {
   position: fixed; inset: 0; z-index: 980;
   background: rgba(14,13,12,.92);
@@ -198,12 +186,9 @@ body::after {
 .orbit-wrap {
   position: absolute; inset: 0; pointer-events: none;
   display: flex; align-items: center; justify-content: center;
-  overflow: hidden; /* keep oversized mobile orbit from causing layout shifts */
+  overflow: hidden;
 }
 .orbit-svg {
-  /* min() keeps orbit inside any viewport.
-     88vw on portrait 375px → ⌀ 330px, which comfortably
-     surrounds the 3-line text block (~220px tall).         */
   width: min(88vw, 88vh); height: min(88vw, 88vh);
   flex-shrink: 0;
   animation: spinOrbit 22s linear infinite; opacity: .55;
@@ -215,7 +200,8 @@ body::after {
 @media (max-width:700px) {
   .orbit-wrap { display: none; }
   .lb-arrow { font-size:2rem; padding:.8rem 1rem; }
-}</style>
+}
+</style>
 </head>
 <body>
 
@@ -320,7 +306,7 @@ var ALL = [
   "outfit inspo.jpg",
 ];
 
-/* ── FIX 1: Fisher-Yates shuffle (replaces biased sort-based shuffle) ── */
+/* ── Fisher-Yates shuffle ── */
 function shuffle(a) {
   var b = a.slice();
   for (var i = b.length - 1; i > 0; i--) {
@@ -330,7 +316,11 @@ function shuffle(a) {
   return b;
 }
 
-/* ── dimensions ── */
+/* ── Pre-encode all image paths once at startup ──────────────────────────
+   Avoids repeated encodeURIComponent() on every lightbox open/navigate.  */
+var ALL_PATHS = ALL.map(function(f) { return 'images/' + encodeURIComponent(f); });
+
+/* ── Dimensions ── */
 var VH   = window.innerHeight;
 var COLS = window.innerWidth < 700 ? 3 : window.innerWidth < 1100 ? 5 : 7;
 var ROWS = Math.ceil(36 / COLS);
@@ -343,30 +333,39 @@ var grid = document.getElementById('grid');
 grid.style.gridTemplateColumns = 'repeat(' + COLS + ', 1fr)';
 grid.style.gridTemplateRows    = 'repeat(' + ROWS + ', ' + rowHeight.toFixed(2) + 'px)';
 
-/* Recalculate row/card heights on resize (handles zoom and orientation change).
-   Column count is fixed per session to avoid full DOM rebuild.               */
+/* ── Debounced resize handler ────────────────────────────────────────────
+   Original had a 2px guard but no debounce — rapid resize events during
+   window drag still fired many layout reads. Now deferred 80ms.          */
+var resizeTimer = null;
 window.addEventListener('resize', function() {
-  var newVH = window.innerHeight;
-  if (Math.abs(newVH - VH) < 2) return; /* ignore sub-pixel jitter */
-  VH = newVH;
-  rowHeight  = VH / (ROWS + 2);
-  cardHeight = rowHeight * 3;
-  grid.style.gridTemplateRows = 'repeat(' + ROWS + ', ' + rowHeight.toFixed(2) + 'px)';
-  cards.forEach(function(c) {
-    c.el.style.height = cardHeight.toFixed(2) + 'px';
-    /* invalidate cached rest-center so physics stays accurate */
-    if (c.ready) {
-      var rect = c.el.getBoundingClientRect();
-      c.restCx = rect.left + rect.width  / 2;
-      c.restCy = rect.top  + rect.height / 2;
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(function() {
+    var newVH = window.innerHeight;
+    if (Math.abs(newVH - VH) < 2) return;
+    VH = newVH;
+    rowHeight  = VH / (ROWS + 2);
+    cardHeight = rowHeight * 3;
+    grid.style.gridTemplateRows = 'repeat(' + ROWS + ', ' + rowHeight.toFixed(2) + 'px)';
+    var len = cards.length;
+    for (var i = 0; i < len; i++) {
+      var c = cards[i];
+      c.el.style.height = cardHeight.toFixed(2) + 'px';
+      if (c.ready) {
+        var rect = c.el.getBoundingClientRect();
+        c.restCx = rect.left + rect.width  / 2;
+        c.restCy = rect.top  + rect.height / 2;
+      }
     }
-  });
+  }, 80);
 });
 
-/* ── FIX 2: Pool fill without intermediate array churn ── */
+/* ── Pool fill ── */
 var pool = [];
 while (pool.length < COUNT) pool = pool.concat(shuffle(ALL));
 pool = pool.slice(0, COUNT);
+
+/* Pre-encode pool paths so openLb / lbNavigate are O(1) string reads */
+var poolPaths = pool.map(function(f) { return 'images/' + encodeURIComponent(f); });
 
 var ROTS = [-8,-6,-5,-4,-3,-2,-1,0,1,2,3,4,5,6,8];
 
@@ -374,8 +373,7 @@ var DUR      = 0.20;
 var COL_STEP = 0.026;
 var ROW_STEP = (COLS - 1) * COL_STEP + DUR + 0.055;
 
-/* ── FIX 3: Lightbox elements declared here so grid click handler
-            can reference them without relying on var-hoisting ── */
+/* ── Lightbox elements ── */
 var lb        = document.getElementById('lb');
 var lbFrame   = document.getElementById('lb-frame');
 var lbImg     = document.getElementById('lb-img');
@@ -389,14 +387,15 @@ function attachHover(c) {
     clearTimeout(hoverTimer);
     hoverTimer = setTimeout(function() {
       hoveredCard = c;
-      c.el.style.zIndex = (c.row + 1) * 2 + 50; /* lift above neighbours */
+      c.el.style.zIndex = (c.row + 1) * 2 + 50;
+      wakePhysics(); /* resume RAF if it was paused */
     }, 55);
   });
   c.el.addEventListener('mouseleave', function() {
     clearTimeout(hoverTimer);
     if (hoveredCard === c) {
       hoveredCard = null;
-      c.el.style.zIndex = (c.row + 1) * 2;       /* restore */
+      c.el.style.zIndex = (c.row + 1) * 2;
     }
   });
 }
@@ -420,120 +419,208 @@ pool.forEach(function(file, i) {
   img.decoding = 'async';
   img.loading  = 'eager';
   img.onerror  = function() { card.style.background = '#1a1815'; };
-  img.src      = 'images/' + encodeURIComponent(file);
+  img.src      = poolPaths[i]; /* use pre-encoded path */
 
   card.appendChild(img);
   grid.appendChild(card);
 
   var c = {
-    el: card, file: file, row: row, baseRot: rot,
+    el: card, row: row, baseRot: rot,
     tx:0, ty:0, rz:rot, sc:1,
-    vx:0, vy:0, vs:0,          /* spring velocities */
-    ttx:0, tty:0, trz:rot, tsc:1,
+    vx:0, vy:0, vs:0,
+    ttx:0, tty:0, tsc:1,
     restCx: 0, restCy: 0,
     ready: false,
+    /* sleeping: true = skip physics this frame (no forces, near-zero velocity) */
+    sleeping: false,
   };
 
-  /* ── FIX 4: Store pool index directly on element for O(1) click lookup ── */
   card._poolIdx = i;
 
   card.addEventListener('animationend', function() {
-    /* Cache rest-center once, right after the entry animation settles.
-       getBoundingClientRect here is free — called only once per card.   */
     var rect = card.getBoundingClientRect();
     c.restCx = rect.left + rect.width  / 2;
     c.restCy = rect.top  + rect.height / 2;
-    c.ready = true;
+    c.ready  = true;
   });
 
   cards.push(c);
   attachHover(c);
 });
 
-/* ── physics ── */
+/* ── Physics constants ── */
 var PUSH_F = 28;
 var mx = -9999, my = -9999;
 
-/*
- * Spring constants:
- *   K  — stiffness  (higher = snappier)
- *   D  — damping    (lower  = more overshoot / "pop" feel)
- *
- * translate/scale use different damping:
- *   translate: D=0.62 → noticeable overshoot, card visibly jumps
- *   scale:     D=0.58 → slightly more overshoot for the size pop
- * Return-to-rest uses higher damping so the settle is smooth, not bouncy.
- */
-var SP_K   = 0.22;   /* stiffness                        */
-var SP_D   = 0.62;   /* damping while hovered            */
-var SP_D_R = 0.72;   /* damping while returning to rest  */
+var SP_K   = 0.22;
+var SP_D   = 0.62;
+var SP_D_R = 0.72;
 
-function spring(cur, vel, target, k, d) {
-  var f  = (target - cur) * k;
-  vel    = vel * d + f;
-  return { v: vel, x: cur + vel };
-}
+/* Thresholds below which a card is considered at rest */
+var SLEEP_VEL = 0.008;  /* velocity magnitude */
+var SLEEP_POS = 0.04;   /* displacement magnitude */
 
-/* Currently hovered card data object (null = none) */
 var hoveredCard = null;
 var hoverTimer  = null;
 
-window.addEventListener('mousemove',  function(e) { mx = e.clientX; my = e.clientY; });
-window.addEventListener('mouseleave', function()  { mx = -9999; my = -9999; clearTimeout(hoverTimer); hoveredCard = null; });
+/* ── RAF pause/wake system ───────────────────────────────────────────────
+   When every card is sleeping, we cancel the animation frame to save CPU.
+   Any interaction (mouse move, hover enter) calls wakePhysics() which
+   restarts the loop. This is transparent to the user.                    */
+var rafId      = null;
+var physicsOn  = false;
 
-/*
- * mouseenter/mouseleave attached directly on each card (see attachHover above).
- * Delegated mouseover re-fires when a card's z-index changes and covers the
- * cursor, creating an oscillation loop. mouseenter/mouseleave don't bubble
- * and are immune to z-index shifts — no more flicker.
- */
+function wakePhysics() {
+  if (physicsOn) return;
+  physicsOn = true;
+  rafId = requestAnimationFrame(tick);
+}
 
-/*
- * Sequential shine — left→right, top→bottom.
- *
- * SHINE_STEP  — delay between cards (ms); scales so the full wave
- *               always takes ~3 s regardless of how many cards are on screen.
- * SHINE_PAUSE — rest between waves (ms).
- *
- * Start condition: all images settled (loaded or errored).
- * Hard fallback  : start anyway after 6 s in case any event was missed
- *                  (common on iOS when images load from cache synchronously).
- */
-var SHINE_STEP  = Math.round(6000 / cards.length); /* wave always ~6 s */
+function pausePhysics() {
+  physicsOn = false;
+  if (rafId !== null) {
+    cancelAnimationFrame(rafId);
+    rafId = null;
+  }
+}
+
+window.addEventListener('mousemove', function(e) {
+  mx = e.clientX; my = e.clientY;
+  wakePhysics();
+});
+window.addEventListener('mouseleave', function() {
+  mx = -9999; my = -9999;
+  clearTimeout(hoverTimer);
+  hoveredCard = null;
+  /* Don't pause here — let cards finish their return-to-rest animation */
+});
+
+/* ── Main physics loop ───────────────────────────────────────────────────
+   Key changes vs original:
+   1. `for` loop instead of `forEach` — avoids callback overhead
+   2. Spring math inlined — no object `{v, x}` allocated per call per frame
+   3. Sleep check — cards at rest skip all math + DOM write
+   4. Auto-pause when all cards are sleeping                               */
+function tick() {
+  var len = cards.length;
+  var allSleeping = true;
+
+  for (var i = 0; i < len; i++) {
+    var c = cards[i];
+    if (!c.ready) { allSleeping = false; continue; }
+
+    var hovered = (c === hoveredCard);
+    var damp    = hovered ? SP_D : SP_D_R;
+
+    /* ── Compute target state ── */
+    if (hovered) {
+      var dx   = (c.restCx + c.tx) - mx;
+      var dy   = (c.restCy + c.ty) - my;
+      var dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist > 0) {
+        c.ttx = (dx / dist) * PUSH_F;
+        c.tty = (dy / dist) * PUSH_F;
+      }
+      c.tsc = 1.10;
+    } else {
+      c.ttx = 0; c.tty = 0; c.tsc = 1;
+    }
+
+    /* ── Sleep check ─────────────────────────────────────────────────────
+       If not hovered AND displacement + velocity are negligible, snap to
+       rest and skip the DOM write. Avoids per-frame style mutation for the
+       vast majority of cards that aren't being interacted with.          */
+    if (!hovered &&
+        c.vx > -SLEEP_VEL && c.vx < SLEEP_VEL &&
+        c.vy > -SLEEP_VEL && c.vy < SLEEP_VEL &&
+        c.vs > -SLEEP_VEL && c.vs < SLEEP_VEL &&
+        c.tx > -SLEEP_POS && c.tx < SLEEP_POS &&
+        c.ty > -SLEEP_POS && c.ty < SLEEP_POS &&
+        c.sc > 1 - SLEEP_POS && c.sc < 1 + SLEEP_POS) {
+      if (!c.sleeping) {
+        /* One final write to settle exactly to baseRot */
+        c.tx = 0; c.ty = 0; c.sc = 1;
+        c.vx = 0; c.vy = 0; c.vs = 0;
+        c.rz = c.baseRot;
+        c.el.style.transform = 'rotate(' + c.baseRot + 'deg)';
+        c.sleeping = true;
+      }
+      continue; /* skip this card entirely */
+    }
+
+    c.sleeping = false;
+    allSleeping = false;
+
+    /* ── Inlined spring integration (no object allocation) ──────────────
+       Original spring(cur, vel, target, k, d):
+         force = (target - cur) * k
+         vel   = vel * d + force
+         pos   = cur + vel
+       Inlined 3× here (tx, ty, sc) to eliminate 3 object allocs/frame.  */
+    var f;
+
+    f     = (c.ttx - c.tx) * SP_K;
+    c.vx  = c.vx * damp + f;
+    c.tx += c.vx;
+
+    f     = (c.tty - c.ty) * SP_K;
+    c.vy  = c.vy * damp + f;
+    c.ty += c.vy;
+
+    f     = (c.tsc - c.sc) * SP_K;
+    c.vs  = c.vs * damp + f;
+    c.sc += c.vs;
+
+    c.rz += (c.baseRot - c.rz) * 0.12;
+
+    c.el.style.transform =
+      'translate(' + c.tx.toFixed(1) + 'px,' + c.ty.toFixed(1) + 'px)' +
+      ' rotate(' + c.rz.toFixed(2) + 'deg)' +
+      ' scale(' + c.sc.toFixed(3) + ')';
+  }
+
+  /* Pause the loop when nothing is moving — restarts on next interaction */
+  if (allSleeping) {
+    pausePhysics();
+  } else {
+    rafId = requestAnimationFrame(tick);
+  }
+}
+
+/* Start physics — will auto-pause once all cards are settled */
+wakePhysics();
+
+/* ── Shine wave ── */
+var SHINE_STEP  = Math.round(6000 / cards.length);
 var SHINE_PAUSE = 5000;
 
-var imgsTotal    = cards.length;
-var imgsLoaded   = 0;
+var imgsTotal  = cards.length;
+var imgsLoaded = 0;
 var shineStarted = false;
 
 function onImgSettled() {
   if (shineStarted) return;
-  imgsLoaded++;
-  if (imgsLoaded >= imgsTotal) startShine();
+  if (++imgsLoaded >= imgsTotal) startShine();
 }
 
 function startShine() {
   if (shineStarted) return;
   shineStarted = true;
+  clearTimeout(shineTimeout);
   runShineWave();
 }
 
-/* Hard fallback — if events were missed (iOS cache quirk etc.) */
 var shineTimeout = setTimeout(startShine, 6000);
 
-/* Attach settled-counters to every card image.
-   Check naturalWidth > 0 (not just .complete) — on iOS .complete can be
-   true for a broken/pending image, naturalWidth is 0 until decoded. */
 cards.forEach(function(c) {
   var img = c.el.querySelector('img');
-  if (!img) { onImgSettled(); return; }
-  if (img.complete && img.naturalWidth > 0) { onImgSettled(); return; }
+  if (!img)                                   { onImgSettled(); return; }
+  if (img.complete && img.naturalWidth > 0)   { onImgSettled(); return; }
   img.addEventListener('load',  onImgSettled, { once: true });
   img.addEventListener('error', onImgSettled, { once: true });
 });
 
 function runShineWave() {
-  clearTimeout(shineTimeout); /* cancel fallback once wave is running */
   var i = 0;
   function next() {
     if (i >= cards.length) {
@@ -550,56 +637,15 @@ function runShineWave() {
   next();
 }
 
-function tick() {
-  requestAnimationFrame(tick);
-  cards.forEach(function(c) {
-    if (!c.ready) return;
-
-    var hovered = (c === hoveredCard);
-    var damp = hovered ? SP_D : SP_D_R;
-
-    if (hovered) {
-      var dx = (c.restCx + c.tx) - mx;
-      var dy = (c.restCy + c.ty) - my;
-      var dist = Math.sqrt(dx * dx + dy * dy);
-      if (dist > 0) {
-        c.ttx = (dx / dist) * PUSH_F;
-        c.tty = (dy / dist) * PUSH_F;
-      }
-      c.tsc = 1.10;
-    } else {
-      c.ttx = 0; c.tty = 0; c.tsc = 1;
-    }
-    c.trz = c.baseRot; /* rotation never changes */
-
-    var rx = spring(c.tx, c.vx, c.ttx, SP_K, damp);
-    var ry = spring(c.ty, c.vy, c.tty, SP_K, damp);
-    var rs = spring(c.sc, c.vs, c.tsc, SP_K, damp);
-    c.tx = rx.x; c.vx = rx.v;
-    c.ty = ry.x; c.vy = ry.v;
-    c.sc = rs.x; c.vs = rs.v;
-    c.rz += (c.trz - c.rz) * 0.12;
-
-    c.el.style.transform =
-      'translate(' + c.tx.toFixed(1) + 'px,' + c.ty.toFixed(1) + 'px)' +
-      ' rotate(' + c.rz.toFixed(2) + 'deg)' +
-      ' scale(' + c.sc.toFixed(3) + ')';
-    /* z-index is set once in attachHover, not per-frame — avoids
-       z-index thrash triggering mouseleave/mouseenter oscillation */
-  });
-}
-tick();
-
-/* ── grid click ── */
+/* ── Grid click (delegated) ── */
 grid.addEventListener('click', function(e) {
   if (lb.classList.contains('on')) return;
   var cardEl = e.target.closest('.card');
   if (!cardEl) return;
-  /* ── FIX 4 (cont): O(1) index read instead of findIndex O(n) ── */
   openLb(cardEl._poolIdx);
 });
 
-/* ── lightbox ── */
+/* ── Lightbox ── */
 function updateCounter() {
   lbCounter.textContent = (currentIdx + 1) + ' / ' + COUNT;
 }
@@ -607,7 +653,7 @@ function updateCounter() {
 function openLb(idx) {
   if (lb.classList.contains('on')) return;
   currentIdx = idx;
-  lbImg.src  = 'images/' + encodeURIComponent(pool[idx]);
+  lbImg.src  = poolPaths[idx]; /* pre-encoded path — no runtime encodeURIComponent */
   lbFrame.className = 'lb-frame anim-open';
   lb.classList.add('on');
   updateCounter();
@@ -616,9 +662,9 @@ function openLb(idx) {
 function lbNavigate(dir) {
   currentIdx = (currentIdx + dir + COUNT) % COUNT;
   lbFrame.className = 'lb-frame';
-  void lbFrame.offsetWidth; /* reflow to restart animation */
+  void lbFrame.offsetWidth;
   lbFrame.className = 'lb-frame ' + (dir > 0 ? 'anim-l' : 'anim-r');
-  lbImg.src = 'images/' + encodeURIComponent(pool[currentIdx]);
+  lbImg.src = poolPaths[currentIdx]; /* pre-encoded */
   updateCounter();
 }
 
@@ -636,7 +682,6 @@ document.getElementById('lb-next').addEventListener('click', function(e) {
   e.stopPropagation(); lbNavigate(1);
 });
 
-/* keyboard */
 document.addEventListener('keydown', function(e) {
   if (!lb.classList.contains('on')) return;
   if (e.key === 'ArrowLeft')  lbNavigate(-1);
@@ -644,7 +689,6 @@ document.addEventListener('keydown', function(e) {
   if (e.key === 'Escape')     closeLb();
 });
 
-/* swipe */
 var swipeX = 0;
 lb.addEventListener('touchstart', function(e) { swipeX = e.touches[0].clientX; }, {passive: true});
 lb.addEventListener('touchend',   function(e) {
@@ -652,7 +696,7 @@ lb.addEventListener('touchend',   function(e) {
   if (Math.abs(dx) > 48) lbNavigate(dx < 0 ? 1 : -1);
 });
 
-/* ── welcome ── */
+/* ── Welcome ── */
 var welcome = document.getElementById('welcome');
 if (localStorage.getItem('mb_seen')) {
   welcome.style.display = 'none';
@@ -665,24 +709,20 @@ if (localStorage.getItem('mb_seen')) {
   });
 }
 
-/* touch repel */
+/* Touch repel */
 window.addEventListener('touchmove', function(e) {
   mx = e.touches[0].clientX; my = e.touches[0].clientY;
+  wakePhysics();
 }, {passive: true});
 window.addEventListener('touchend', function() { mx = -9999; my = -9999; });
 
-/* ── orbit: fit text exactly to circumference ──────────────────────────────
- * getComputedTextLength() returns the real rendered width in SVG user units,
- * accounting for the actual font metrics in this browser/OS.
- * letter-spacing = (circumference − naturalWidth) / numChars
- * numChars = length of the string (spacing is applied after each glyph).
- * ────────────────────────────────────────────────────────────────────────── */
+/* ── Orbit text fit ── */
 (function fitOrbit() {
-  var tp   = document.getElementById('orbit-text');
+  var tp = document.getElementById('orbit-text');
   if (!tp) return;
-  var circ = 2 * Math.PI * 260;              /* path radius = 260 SVG units */
-  var nat  = tp.getComputedTextLength();     /* natural width, no extra spacing */
-  var n    = tp.textContent.length;          /* number of glyphs              */
+  var circ = 2 * Math.PI * 260;
+  var nat  = tp.getComputedTextLength();
+  var n    = tp.textContent.length;
   var ls   = (circ - nat) / n;
   tp.parentElement.setAttribute('letter-spacing', ls.toFixed(4));
 })();
