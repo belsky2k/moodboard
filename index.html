@@ -163,6 +163,7 @@ body::after {
   inset: 0;
   z-index: 900;
   background: rgba(14, 13, 12, .96);
+  overflow: hidden;
 
   /* Respect device safe areas (notch / home indicator) */
   padding-top:    max(3.2rem, env(safe-area-inset-top,    0px));
@@ -182,18 +183,21 @@ body::after {
   display: flex;
   align-items:     center;
   justify-content: center;
-  max-width:  calc(100vw - 6.4rem);
-  max-height: calc(100vh - 7.2rem);
   border-radius: 14px;
   overflow: hidden;
+  /* размер определяется изображением внутри */
+  flex-shrink: 1;
+  min-width: 0;
+  min-height: 0;
 }
 
 .lb-frame img {
   display: block;
   width:  auto;
   height: auto;
-  max-width:  min(100%, calc(100vw - 6.4rem));
-  max-height: min(100%, calc(100vh - 7.2rem));
+  /* ограничение задаётся напрямую через viewport — не зависит от родителя */
+  max-width:  calc(100vw - 6.4rem);
+  max-height: calc(100vh - 7.2rem);
   object-fit: contain;
   filter: contrast(1.06) saturate(0.85);
   border-radius: 14px;
