@@ -185,7 +185,7 @@ body::after {
   justify-content: center;
   border-radius: 14px;
   overflow: hidden;
-  /* The size is determined by the image inside */
+  /* размер определяется изображением внутри */
   flex-shrink: 1;
   min-width: 0;
   min-height: 0;
@@ -195,7 +195,7 @@ body::after {
   display: block;
   width:  auto;
   height: auto;
-  /* The constraint is set directly via the viewport — it is independent of the parent */
+  /* ограничение задаётся напрямую через viewport — не зависит от родителя */
   max-width:  calc(100vw - 6.4rem);
   max-height: calc(100vh - 7.2rem);
   object-fit: contain;
@@ -826,6 +826,11 @@ const PhysicsEngine = (() => {
         hoveredCard = cardState;
         /* Lift the card above its neighbours while hovered */
         cardState.el.style.zIndex = (cardState.row + 1) * 2 + 50;
+        /* Shine sweep on hover */
+        if (!cardState.el.classList.contains('shine')) {
+          cardState.el.classList.add('shine');
+          setTimeout(() => cardState.el.classList.remove('shine'), 950);
+        }
         wake();
       }, 55);
     });
@@ -1306,7 +1311,6 @@ const OrbitTextFitter = (() => {
 
   /* ── 5. Initialise subsystems ── */
   PhysicsEngine.init(cardStates);
-  ShineAnimator.init(cardStates);
   Lightbox.init(poolPaths, GridSystem.cardCount);
   WelcomeOverlay.init();
   OrbitTextFitter.fit();
