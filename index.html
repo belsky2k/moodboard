@@ -5,11 +5,26 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Moodboard</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>☁️</text></svg>">
+
 <style>
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+/* ==========================================================================
+   RESET
+   ========================================================================== */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin:  0;
+  padding: 0;
+}
+
+
+/* ==========================================================================
+   BASE LAYOUT
+   ========================================================================== */
 
 html, body {
-  width: 100%; height: 100%;
+  width:  100%;
+  height: 100%;
   background: #0E0D0C;
   overflow: hidden;
 }
@@ -24,6 +39,11 @@ html, body {
   row-gap: 0;
 }
 
+
+/* ==========================================================================
+   CARD — layout, image, hover physics target
+   ========================================================================== */
+
 .card {
   position: relative;
   overflow: hidden;
@@ -34,13 +54,22 @@ html, body {
 
 .card img {
   display: block;
-  width: 100%; height: 100%;
+  width:  100%;
+  height: 100%;
   object-fit: cover;
   pointer-events: none;
   user-select: none;
   filter: contrast(1.04) saturate(0.88);
   transition: filter .2s;
 }
+
+
+/* ==========================================================================
+   CARD — shine sweep pseudo-element
+   The ::after overlay is positioned off-screen left by default.
+   Adding the `.shine` class triggers the keyframe animation that slides
+   the gradient highlight across the card from left to right.
+   ========================================================================== */
 
 .card::after {
   content: '';
@@ -49,73 +78,120 @@ html, body {
   border-radius: inherit;
   background: linear-gradient(
     118deg,
-    transparent           30%,
-    rgba(255,255,255,.13) 48%,
-    rgba(255,255,255,.22) 52%,
-    transparent           68%
+    transparent             30%,
+    rgba(255,255,255, .13)  48%,
+    rgba(255,255,255, .22)  52%,
+    transparent             68%
   );
   transform: translateX(-130%);
   opacity: 0;
   pointer-events: none;
   z-index: 2;
 }
+
 .card.shine::after {
-  animation: shineSweep .9s cubic-bezier(.4,0,.2,1) forwards;
+  animation: shineSweep .9s cubic-bezier(.4, 0, .2, 1) forwards;
 }
+
 @keyframes shineSweep {
   0%   { transform: translateX(-130%); opacity: 1; }
   60%  { opacity: 1; }
   100% { transform: translateX(130%);  opacity: 0; }
 }
 
-body::before {
-  content: '';
-  position: fixed; inset: 0; z-index: 800; pointer-events: none;
-  background: repeating-linear-gradient(
-    0deg, transparent, transparent 2px,
-    rgba(0,0,0,.18) 2px, rgba(0,0,0,.18) 4px
-  );
-}
 
-body::after {
-  content: '';
-  position: fixed; inset: 0; z-index: 801; pointer-events: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='.07'/%3E%3C/svg%3E");
-  animation: grainShift 0.08s steps(1) infinite;
-  opacity: .7;
-}
-@keyframes grainShift {
-  0%  { transform: translate(0,0); }
-  25% { transform: translate(-2px,1px); }
-  50% { transform: translate(1px,-1px); }
-  75% { transform: translate(-1px,2px); }
-}
+/* ==========================================================================
+   CARD — staggered entry animation
+   --init-rot is set per-card via inline style so each card enters with its
+   own random tilt, preserving the rotation through the scale/translate arc.
+   ========================================================================== */
 
 @keyframes cardIn {
   from { opacity: 0; transform: var(--init-rot) scale(.94) translateY(6px); }
   to   { opacity: 1; transform: var(--init-rot) scale(1)   translateY(0);   }
 }
 
+
+/* ==========================================================================
+   SCREEN OVERLAYS — CRT scanlines + grain noise
+   Both are pointer-events:none and live at z-index 800/801 to sit above
+   card content but below the lightbox (z-index 900) and welcome (980).
+   ========================================================================== */
+
+/* Horizontal scanline bands (CRT effect) */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 800;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,          transparent          2px,
+    rgba(0, 0, 0, .18)   2px,                 rgba(0, 0, 0, .18) 4px
+  );
+}
+
+/* Animated film-grain noise layer */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 801;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='.07'/%3E%3C/svg%3E");
+  animation: grainShift 0.08s steps(1) infinite;
+  opacity: .7;
+}
+
+/* Step-translate the grain each frame so it appears to randomly shift */
+@keyframes grainShift {
+  0%   { transform: translate(   0,    0); }
+  25%  { transform: translate(-2px,  1px); }
+  50%  { transform: translate( 1px, -1px); }
+  75%  { transform: translate(-1px,  2px); }
+}
+
+
+/* ==========================================================================
+   LIGHTBOX — overlay, frame, image
+   ========================================================================== */
+
 .lb {
-  display: none; position: fixed; inset: 0; z-index: 900;
-  background: rgba(14,13,12,.96);
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  background: rgba(14, 13, 12, .96);
+
+  /* Respect device safe areas (notch / home indicator) */
   padding-top:    max(3.2rem, env(safe-area-inset-top,    0px));
   padding-bottom: max(2.4rem, env(safe-area-inset-bottom, 0px));
   padding-left:   max(3.2rem, env(safe-area-inset-left,   0px));
   padding-right:  max(3.2rem, env(safe-area-inset-right,  0px));
-  align-items: center; justify-content: center; cursor: default;
+
+  align-items:     center;
+  justify-content: center;
+  cursor: default;
 }
+
 .lb.on { display: flex; }
 
 .lb-frame {
   position: relative;
-  display: flex; align-items: center; justify-content: center;
-  max-width: 100%; max-height: 100%;
-  border-radius: 14px; overflow: hidden;
+  display: flex;
+  align-items:     center;
+  justify-content: center;
+  max-width:  100%;
+  max-height: 100%;
+  border-radius: 14px;
+  overflow: hidden;
 }
+
 .lb-frame img {
   display: block;
-  width: auto; height: auto;
+  width:  auto;
+  height: auto;
   max-width:  100%;
   max-height: 100%;
   object-fit: contain;
@@ -123,88 +199,161 @@ body::after {
   border-radius: 14px;
 }
 
-@keyframes lbOpen  { from { opacity:0; transform: scale(.96) skewX(-1deg); } to { opacity:1; transform: scale(1) skewX(0); } }
-@keyframes lbSlideL{ from { opacity:0; transform: translateX(28px)  scale(.97); } to { opacity:1; transform: none; } }
-@keyframes lbSlideR{ from { opacity:0; transform: translateX(-28px) scale(.97); } to { opacity:1; transform: none; } }
+/* Lightbox entry + directional-slide animations */
+@keyframes lbOpen   { from { opacity: 0; transform: scale(.96) skewX(-1deg); } to { opacity: 1; transform: scale(1) skewX(0); } }
+@keyframes lbSlideL { from { opacity: 0; transform: translateX( 28px) scale(.97); } to { opacity: 1; transform: none; } }
+@keyframes lbSlideR { from { opacity: 0; transform: translateX(-28px) scale(.97); } to { opacity: 1; transform: none; } }
 
-.lb-frame.anim-open { animation: lbOpen   .28s cubic-bezier(.22,1,.36,1) both; }
-.lb-frame.anim-l    { animation: lbSlideL .24s cubic-bezier(.22,1,.36,1) both; }
-.lb-frame.anim-r    { animation: lbSlideR .24s cubic-bezier(.22,1,.36,1) both; }
+.lb-frame.anim-open { animation: lbOpen   .28s cubic-bezier(.22, 1, .36, 1) both; }
+.lb-frame.anim-l    { animation: lbSlideL .24s cubic-bezier(.22, 1, .36, 1) both; }
+.lb-frame.anim-r    { animation: lbSlideR .24s cubic-bezier(.22, 1, .36, 1) both; }
+
+
+/* ==========================================================================
+   LIGHTBOX — controls (close button, arrows, counter)
+   ========================================================================== */
 
 .lb-close {
-  position: fixed; top: 1.4rem; right: 1.6rem;
-  font-family: monospace; font-size: .75rem;
-  letter-spacing: .12em; text-transform: uppercase;
-  color: #555; cursor: pointer;
+  position: fixed;
+  top: 1.4rem; right: 1.6rem;
+  font-family: monospace;
+  font-size: .75rem;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: #555;
+  cursor: pointer;
   border: none; background: none;
-  transition: color .18s; z-index: 901;
+  transition: color .18s;
+  z-index: 901;
 }
 .lb-close:hover { color: #ff3c00; }
 
 .lb-arrow {
-  position: fixed; top: 50%; transform: translateY(-50%);
-  font-family: monospace; font-size: 2.6rem; line-height: 1;
-  color: rgba(232,224,212,.2);
-  background: none; border: none; cursor: pointer;
+  position: fixed;
+  top: 50%;
+  transform: translateY(-50%);
+  font-family: monospace;
+  font-size: 2.6rem;
+  line-height: 1;
+  color: rgba(232, 224, 212, .2);
+  background: none; border: none;
+  cursor: pointer;
   padding: 1.2rem 1.4rem;
-  transition: color .18s; z-index: 902;
+  transition: color .18s;
+  z-index: 902;
   user-select: none;
 }
-.lb-arrow:hover { color: rgba(232,224,212,.8); }
+.lb-arrow:hover { color: rgba(232, 224, 212, .8); }
 .lb-arrow-l { left:  .5rem; }
 .lb-arrow-r { right: .5rem; }
 
 .lb-counter {
-  position: fixed; bottom: 1.4rem; left: 50%;
+  position: fixed;
+  bottom: 1.4rem;
+  left: 50%;
   transform: translateX(-50%);
-  font-family: monospace; font-size: .68rem;
-  letter-spacing: .14em; color: #3a3a3a;
-  z-index: 902; pointer-events: none;
+  font-family: monospace;
+  font-size: .68rem;
+  letter-spacing: .14em;
+  color: #3a3a3a;
+  z-index: 902;
+  pointer-events: none;
 }
 
+
+/* ==========================================================================
+   WELCOME OVERLAY — backdrop, text, pulsing hint
+   ========================================================================== */
+
 .welcome {
-  position: fixed; inset: 0; z-index: 980;
-  background: rgba(14,13,12,.92);
-  display: flex; align-items: center; justify-content: center;
+  position: fixed;
+  inset: 0;
+  z-index: 980;
+  background: rgba(14, 13, 12, .92);
+  display: flex;
+  align-items:     center;
+  justify-content: center;
   cursor: default;
   animation: wFadeIn .6s ease both;
 }
-.welcome.hidden { animation: wFadeOut .5s ease both; pointer-events: none; }
+
+.welcome.hidden {
+  animation: wFadeOut .5s ease both;
+  pointer-events: none;
+}
+
 .welcome-text {
   font-family: monospace;
   font-size: clamp(.9rem, 1.8vw, 1.2rem);
-  line-height: 1.9; color: #E8E0D4;
-  letter-spacing: .04em; text-align: center;
-  max-width: 520px; padding: 0 2rem;
+  line-height: 1.9;
+  color: #E8E0D4;
+  letter-spacing: .04em;
+  text-align: center;
+  max-width: 520px;
+  padding: 0 2rem;
 }
+
 .welcome-text span {
-  display: block; margin-top: 2rem;
-  font-size: .72rem; letter-spacing: .14em; color: #555;
+  display: block;
+  margin-top: 2rem;
+  font-size: .72rem;
+  letter-spacing: .14em;
+  color: #555;
   animation: hint 3.2s ease-in-out infinite;
 }
-@keyframes hint { 0%,100%{opacity:0;} 30%,70%{opacity:1;} }
+
+@keyframes hint    { 0%, 100% { opacity: 0; } 30%, 70% { opacity: 1; } }
+@keyframes wFadeIn  { from { opacity: 0; } to { opacity: 1; } }
+@keyframes wFadeOut { from { opacity: 1; } to { opacity: 0; } }
+
+
+/* ==========================================================================
+   ORBIT TEXT — rotating SVG ring on welcome screen
+   ========================================================================== */
+
 .orbit-wrap {
-  position: absolute; inset: 0; pointer-events: none;
-  display: flex; align-items: center; justify-content: center;
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  display: flex;
+  align-items:     center;
+  justify-content: center;
   overflow: hidden;
 }
-.orbit-svg {
-  width: min(88vw, 88vh); height: min(88vw, 88vh);
-  flex-shrink: 0;
-  animation: spinOrbit 22s linear infinite; opacity: .55;
-}
-@keyframes spinOrbit { to { transform: rotate(360deg); } }
-@keyframes wFadeIn  { from{opacity:0;} to{opacity:1;} }
-@keyframes wFadeOut { from{opacity:1;} to{opacity:0;} }
 
-@media (max-width:700px) {
+/* Size is clamped to the smaller viewport axis so it stays circular */
+.orbit-svg {
+  width:  min(88vw, 88vh);
+  height: min(88vw, 88vh);
+  flex-shrink: 0;
+  animation: spinOrbit 22s linear infinite;
+  opacity: .55;
+}
+
+@keyframes spinOrbit { to { transform: rotate(360deg); } }
+
+
+/* ==========================================================================
+   RESPONSIVE OVERRIDES
+   ========================================================================== */
+
+@media (max-width: 700px) {
+  /* Hide the orbit ring on small screens — too small to be legible */
   .orbit-wrap { display: none; }
-  .lb-arrow { font-size:2rem; padding:.8rem 1rem; }
+
+  .lb-arrow {
+    font-size: 2rem;
+    padding: .8rem 1rem;
+  }
 }
 </style>
 </head>
 <body>
 
+
+<!-- =========================================================================
+     WELCOME OVERLAY
+     ========================================================================= -->
 <div class="welcome" id="welcome">
   <div class="welcome-text">
     hey! this is my moodboard,<br>
@@ -212,30 +361,60 @@ body::after {
     my saved photos
     <span>[ click anywhere to begin ]</span>
   </div>
+
   <div class="orbit-wrap">
     <svg class="orbit-svg" viewBox="0 0 600 600" xmlns="http://www.w3.org/2000/svg">
       <defs>
-        <path id="c" d="M 300,300 m -260,0 a 260,260 0 1,1 520,0 a 260,260 0 1,1 -520,0"/>
+        <!--
+          The path traces a full circle with radius 260 centred at (300,300).
+          Written as two 180° arcs so SVG parses it as a closed loop —
+          a single arc from a point back to itself is degenerate.
+        -->
+        <path id="orbitPath"
+          d="M 300,300 m -260,0 a 260,260 0 1,1 520,0 a 260,260 0 1,1 -520,0"/>
       </defs>
       <text font-family="monospace" font-size="14" fill="#3D3B38">
-        <textPath id="orbit-text" href="#c" startOffset="0%">a new selection every refresh · a new selection every refresh · a new selection every refresh · a new selection every refresh · </textPath>
+        <textPath id="orbit-text" href="#orbitPath" startOffset="0%">
+          a new selection every refresh · a new selection every refresh · a new selection every refresh · a new selection every refresh ·
+        </textPath>
       </text>
     </svg>
   </div>
 </div>
 
+
+<!-- =========================================================================
+     MOODBOARD GRID  (populated by GridSystem.init())
+     ========================================================================= -->
 <div class="grid" id="grid"></div>
 
+
+<!-- =========================================================================
+     LIGHTBOX
+     ========================================================================= -->
 <div class="lb" id="lb">
-  <button class="lb-close"        id="lb-close">[ close ]</button>
+  <button class="lb-close"          id="lb-close">[ close ]</button>
   <button class="lb-arrow lb-arrow-l" id="lb-prev">&#8249;</button>
   <button class="lb-arrow lb-arrow-r" id="lb-next">&#8250;</button>
-  <div class="lb-frame anim-open" id="lb-frame"><img id="lb-img" src="" alt="" /></div>
+  <div class="lb-frame anim-open" id="lb-frame">
+    <img id="lb-img" src="" alt="" />
+  </div>
   <div class="lb-counter" id="lb-counter"></div>
 </div>
 
+
 <script>
-var ALL = [
+"use strict";
+
+/* ==========================================================================
+   CONFIGURATION — image catalogue
+   ========================================================================== */
+
+/**
+ * Full list of image filenames.
+ * A random subset is drawn per page load via the GridSystem.
+ */
+const IMAGE_CATALOGUE = [
   "0420454b-2266-4d9c-a740-ec771158fe05.jpg",
   "05e64f41-a19d-493c-9459-0d3eea69f009.jpg",
   "05f7bf95-8ae3-4127-a1ec-c3f7db7af67b.jpg",
@@ -306,425 +485,831 @@ var ALL = [
   "outfit inspo.jpg",
 ];
 
-/* ── Fisher-Yates shuffle ── */
-function shuffle(a) {
-  var b = a.slice();
-  for (var i = b.length - 1; i > 0; i--) {
-    var j = Math.floor(Math.random() * (i + 1));
-    var t = b[i]; b[i] = b[j]; b[j] = t;
+/**
+ * Pre-encode every catalogue path once at startup.
+ * Avoids calling encodeURIComponent() at lightbox open / navigation time.
+ */
+const CATALOGUE_PATHS = IMAGE_CATALOGUE.map(f => `images/${encodeURIComponent(f)}`);
+
+
+/* ==========================================================================
+   CONFIGURATION — layout constants
+   ========================================================================== */
+
+/** Random tilt angles (degrees) assigned to cards on creation. */
+const CARD_ROTATIONS = [-8, -6, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6, 8];
+
+/** Base animation duration for the card-enter keyframe (seconds). */
+const CARD_ENTRY_DURATION = 0.20;
+
+/**
+ * Stagger offsets for the card-entry animation.
+ * Cards are delayed by: row * ROW_STEP + col * COL_STEP seconds.
+ * ROW_STEP is derived so the last card in row N starts after the first
+ * card in row N has nearly finished.
+ */
+const CARD_ENTRY_COL_STEP = 0.026;
+const CARD_ENTRY_ROW_STEP =
+  (/* maxColIndex */ (window.innerWidth < 700 ? 3 : window.innerWidth < 1100 ? 5 : 7) - 1)
+  * CARD_ENTRY_COL_STEP + CARD_ENTRY_DURATION + 0.055;
+
+
+/* ==========================================================================
+   CONFIGURATION — physics constants
+   ========================================================================== */
+
+/**
+ * Spring stiffness: fraction of the gap between current and target
+ * position applied as force each frame. Higher = snappier.
+ */
+const SPRING_STIFFNESS = 0.22;
+
+/**
+ * Spring damping while the card is hovered (lower = more oscillation).
+ * Applied as a multiplier to velocity each frame: vel *= damping.
+ */
+const SPRING_DAMPING_HOVER = 0.62;
+
+/**
+ * Spring damping while the card is returning to rest (higher = overdamped,
+ * settles smoothly without overshooting).
+ */
+const SPRING_DAMPING_RETURN = 0.72;
+
+/**
+ * Repulsion magnitude in pixels: how far the card is pushed away from
+ * the cursor at full proximity.
+ */
+const PUSH_FORCE = 28;
+
+/**
+ * Velocity magnitude below which a card is considered "at rest" for the
+ * sleep check (vx, vy, vs are each independently checked).
+ */
+const SLEEP_VELOCITY_THRESHOLD = 0.008;
+
+/**
+ * Displacement magnitude below which a card is considered "at rest".
+ * Cards outside ±SLEEP_POS on all axes + within scale ±SLEEP_POS of 1
+ * are eligible to enter the sleeping state.
+ */
+const SLEEP_POSITION_THRESHOLD = 0.04;
+
+
+/* ==========================================================================
+   UTILITY — Fisher-Yates shuffle
+   ========================================================================== */
+
+/**
+ * Returns a new array with the elements of `arr` in a random order.
+ * Uses the Fisher-Yates (Knuth) algorithm — O(n), unbiased.
+ */
+const shuffleArray = arr => {
+  const result = arr.slice();
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const temp    = result[i];
+    result[i]     = result[j];
+    result[j]     = temp;
   }
-  return b;
-}
+  return result;
+};
 
-/* ── Pre-encode all image paths once at startup ──────────────────────────
-   Avoids repeated encodeURIComponent() on every lightbox open/navigate.  */
-var ALL_PATHS = ALL.map(function(f) { return 'images/' + encodeURIComponent(f); });
 
-/* ── Dimensions ── */
-var VH   = window.innerHeight;
-var COLS = window.innerWidth < 700 ? 3 : window.innerWidth < 1100 ? 5 : 7;
-var ROWS = Math.ceil(36 / COLS);
-var COUNT = COLS * ROWS;
+/* ==========================================================================
+   DOM CACHE — query once, reference everywhere
+   ========================================================================== */
 
-var rowHeight  = VH / (ROWS + 2);
-var cardHeight = rowHeight * 3;
+const gridEl      = document.getElementById('grid');
+const lightboxEl  = document.getElementById('lb');
+const lbFrameEl   = document.getElementById('lb-frame');
+const lbImgEl     = document.getElementById('lb-img');
+const lbCounterEl = document.getElementById('lb-counter');
+const welcomeEl   = document.getElementById('welcome');
 
-var grid = document.getElementById('grid');
-grid.style.gridTemplateColumns = 'repeat(' + COLS + ', 1fr)';
-grid.style.gridTemplateRows    = 'repeat(' + ROWS + ', ' + rowHeight.toFixed(2) + 'px)';
 
-/* ── Debounced resize handler ────────────────────────────────────────────
-   Original had a 2px guard but no debounce — rapid resize events during
-   window drag still fired many layout reads. Now deferred 80ms.          */
-var resizeTimer = null;
-window.addEventListener('resize', function() {
-  clearTimeout(resizeTimer);
-  resizeTimer = setTimeout(function() {
-    var newVH = window.innerHeight;
-    if (Math.abs(newVH - VH) < 2) return;
-    VH = newVH;
-    rowHeight  = VH / (ROWS + 2);
-    cardHeight = rowHeight * 3;
-    grid.style.gridTemplateRows = 'repeat(' + ROWS + ', ' + rowHeight.toFixed(2) + 'px)';
-    var len = cards.length;
-    for (var i = 0; i < len; i++) {
-      var c = cards[i];
-      c.el.style.height = cardHeight.toFixed(2) + 'px';
-      if (c.ready) {
-        var rect = c.el.getBoundingClientRect();
-        c.restCx = rect.left + rect.width  / 2;
-        c.restCy = rect.top  + rect.height / 2;
-      }
-    }
-  }, 80);
-});
+/* ==========================================================================
+   GRID SYSTEM — column / row layout, pool construction, resize handling
+   ========================================================================== */
 
-/* ── Pool fill ── */
-var pool = [];
-while (pool.length < COUNT) pool = pool.concat(shuffle(ALL));
-pool = pool.slice(0, COUNT);
+const GridSystem = (() => {
 
-/* Pre-encode pool paths so openLb / lbNavigate are O(1) string reads */
-var poolPaths = pool.map(function(f) { return 'images/' + encodeURIComponent(f); });
+  /* Derived from viewport width at init time — not recalculated on resize
+     (column count change would require full DOM rebuild, so we keep it fixed). */
+  const columnCount = window.innerWidth < 700 ? 3
+                    : window.innerWidth < 1100 ? 5
+                    : 7;
 
-var ROTS = [-8,-6,-5,-4,-3,-2,-1,0,1,2,3,4,5,6,8];
+  const rowCount    = Math.ceil(36 / columnCount);
+  const cardCount   = columnCount * rowCount;
 
-var DUR      = 0.20;
-var COL_STEP = 0.026;
-var ROW_STEP = (COLS - 1) * COL_STEP + DUR + 0.055;
+  let viewportHeight = window.innerHeight;
+  let rowHeight      = viewportHeight / (rowCount + 2);
+  let cardHeight     = rowHeight * 3;
 
-/* ── Lightbox elements ── */
-var lb        = document.getElementById('lb');
-var lbFrame   = document.getElementById('lb-frame');
-var lbImg     = document.getElementById('lb-img');
-var lbCounter = document.getElementById('lb-counter');
-var currentIdx = -1;
-
-var cards = [];
-
-function attachHover(c) {
-  c.el.addEventListener('mouseenter', function() {
-    clearTimeout(hoverTimer);
-    hoverTimer = setTimeout(function() {
-      hoveredCard = c;
-      c.el.style.zIndex = (c.row + 1) * 2 + 50;
-      wakePhysics(); /* resume RAF if it was paused */
-    }, 55);
-  });
-  c.el.addEventListener('mouseleave', function() {
-    clearTimeout(hoverTimer);
-    if (hoveredCard === c) {
-      hoveredCard = null;
-      c.el.style.zIndex = (c.row + 1) * 2;
-    }
-  });
-}
-
-pool.forEach(function(file, i) {
-  var row = Math.floor(i / COLS);
-  var col = i % COLS;
-  var rot = ROTS[Math.floor(Math.random() * ROTS.length)];
-
-  var card = document.createElement('div');
-  card.className = 'card';
-  card.style.setProperty('--init-rot', 'rotate(' + rot + 'deg)');
-  card.style.height  = cardHeight.toFixed(2) + 'px';
-  card.style.zIndex  = (row + 1) * 2;
-  card.style.animation =
-    'cardIn ' + DUR + 's ' +
-    (row * ROW_STEP + col * COL_STEP).toFixed(3) + 's ' +
-    'cubic-bezier(.22,1,.36,1) both';
-
-  var img = document.createElement('img');
-  img.decoding = 'async';
-  img.loading  = 'eager';
-  img.onerror  = function() { card.style.background = '#1a1815'; };
-  img.src      = poolPaths[i]; /* use pre-encoded path */
-
-  card.appendChild(img);
-  grid.appendChild(card);
-
-  var c = {
-    el: card, row: row, baseRot: rot,
-    tx:0, ty:0, rz:rot, sc:1,
-    vx:0, vy:0, vs:0,
-    ttx:0, tty:0, tsc:1,
-    restCx: 0, restCy: 0,
-    ready: false,
-    /* sleeping: true = skip physics this frame (no forces, near-zero velocity) */
-    sleeping: false,
+  /** Apply CSS grid column + row track definitions. */
+  const applyGridStyle = () => {
+    gridEl.style.gridTemplateColumns = `repeat(${columnCount}, 1fr)`;
+    gridEl.style.gridTemplateRows    = `repeat(${rowCount}, ${rowHeight.toFixed(2)}px)`;
   };
 
-  card._poolIdx = i;
-
-  card.addEventListener('animationend', function() {
-    var rect = card.getBoundingClientRect();
-    c.restCx = rect.left + rect.width  / 2;
-    c.restCy = rect.top  + rect.height / 2;
-    c.ready  = true;
-  });
-
-  cards.push(c);
-  attachHover(c);
-});
-
-/* ── Physics constants ── */
-var PUSH_F = 28;
-var mx = -9999, my = -9999;
-
-var SP_K   = 0.22;
-var SP_D   = 0.62;
-var SP_D_R = 0.72;
-
-/* Thresholds below which a card is considered at rest */
-var SLEEP_VEL = 0.008;  /* velocity magnitude */
-var SLEEP_POS = 0.04;   /* displacement magnitude */
-
-var hoveredCard = null;
-var hoverTimer  = null;
-
-/* ── RAF pause/wake system ───────────────────────────────────────────────
-   When every card is sleeping, we cancel the animation frame to save CPU.
-   Any interaction (mouse move, hover enter) calls wakePhysics() which
-   restarts the loop. This is transparent to the user.                    */
-var rafId      = null;
-var physicsOn  = false;
-
-function wakePhysics() {
-  if (physicsOn) return;
-  physicsOn = true;
-  rafId = requestAnimationFrame(tick);
-}
-
-function pausePhysics() {
-  physicsOn = false;
-  if (rafId !== null) {
-    cancelAnimationFrame(rafId);
-    rafId = null;
-  }
-}
-
-window.addEventListener('mousemove', function(e) {
-  mx = e.clientX; my = e.clientY;
-  wakePhysics();
-});
-window.addEventListener('mouseleave', function() {
-  mx = -9999; my = -9999;
-  clearTimeout(hoverTimer);
-  hoveredCard = null;
-  /* Don't pause here — let cards finish their return-to-rest animation */
-});
-
-/* ── Main physics loop ───────────────────────────────────────────────────
-   Key changes vs original:
-   1. `for` loop instead of `forEach` — avoids callback overhead
-   2. Spring math inlined — no object `{v, x}` allocated per call per frame
-   3. Sleep check — cards at rest skip all math + DOM write
-   4. Auto-pause when all cards are sleeping                               */
-function tick() {
-  var len = cards.length;
-  var allSleeping = true;
-
-  for (var i = 0; i < len; i++) {
-    var c = cards[i];
-    if (!c.ready) { allSleeping = false; continue; }
-
-    var hovered = (c === hoveredCard);
-    var damp    = hovered ? SP_D : SP_D_R;
-
-    /* ── Compute target state ── */
-    if (hovered) {
-      var dx   = (c.restCx + c.tx) - mx;
-      var dy   = (c.restCy + c.ty) - my;
-      var dist = Math.sqrt(dx * dx + dy * dy);
-      if (dist > 0) {
-        c.ttx = (dx / dist) * PUSH_F;
-        c.tty = (dy / dist) * PUSH_F;
-      }
-      c.tsc = 1.10;
-    } else {
-      c.ttx = 0; c.tty = 0; c.tsc = 1;
+  /**
+   * Build the pool of images to display.
+   *
+   * We need exactly `cardCount` images. If there are fewer in the catalogue
+   * we repeat shuffled copies of the full list until we have enough, then
+   * truncate. This guarantees the pool is always full with no blank cells.
+   */
+  const buildPool = () => {
+    let pool = [];
+    while (pool.length < cardCount) {
+      pool = pool.concat(shuffleArray(IMAGE_CATALOGUE));
     }
+    return pool.slice(0, cardCount);
+  };
 
-    /* ── Sleep check ─────────────────────────────────────────────────────
-       If not hovered AND displacement + velocity are negligible, snap to
-       rest and skip the DOM write. Avoids per-frame style mutation for the
-       vast majority of cards that aren't being interacted with.          */
-    if (!hovered &&
-        c.vx > -SLEEP_VEL && c.vx < SLEEP_VEL &&
-        c.vy > -SLEEP_VEL && c.vy < SLEEP_VEL &&
-        c.vs > -SLEEP_VEL && c.vs < SLEEP_VEL &&
-        c.tx > -SLEEP_POS && c.tx < SLEEP_POS &&
-        c.ty > -SLEEP_POS && c.ty < SLEEP_POS &&
-        c.sc > 1 - SLEEP_POS && c.sc < 1 + SLEEP_POS) {
-      if (!c.sleeping) {
-        /* One final write to settle exactly to baseRot */
-        c.tx = 0; c.ty = 0; c.sc = 1;
-        c.vx = 0; c.vy = 0; c.vs = 0;
-        c.rz = c.baseRot;
-        c.el.style.transform = 'rotate(' + c.baseRot + 'deg)';
-        c.sleeping = true;
+  /**
+   * Debounced resize handler.
+   *
+   * Only row heights change on resize — column count stays fixed to avoid
+   * rebuilding the entire DOM. A 2-pixel guard prevents micro-adjustments
+   * from triggering unnecessary layout work.
+   */
+  let resizeDebounceTimer = null;
+
+  const onResize = (cards) => {
+    clearTimeout(resizeDebounceTimer);
+    resizeDebounceTimer = setTimeout(() => {
+      const newViewportHeight = window.innerHeight;
+      if (Math.abs(newViewportHeight - viewportHeight) < 2) return;
+
+      viewportHeight = newViewportHeight;
+      rowHeight      = viewportHeight / (rowCount + 2);
+      cardHeight     = rowHeight * 3;
+
+      gridEl.style.gridTemplateRows = `repeat(${rowCount}, ${rowHeight.toFixed(2)}px)`;
+
+      /* Recalculate card heights and rest-position centres in a single pass.
+         getBoundingClientRect() is safe here — we're outside the RAF loop
+         and only called at most once per 80ms. */
+      for (const cardState of cards) {
+        cardState.el.style.height = cardHeight.toFixed(2) + 'px';
+        if (cardState.ready) {
+          const rect          = cardState.el.getBoundingClientRect();
+          cardState.restCenterX = rect.left + rect.width  / 2;
+          cardState.restCenterY = rect.top  + rect.height / 2;
+        }
       }
-      continue; /* skip this card entirely */
-    }
+    }, 80);
+  };
 
-    c.sleeping = false;
-    allSleeping = false;
+  return { columnCount, rowCount, cardCount, rowHeight, cardHeight, buildPool, applyGridStyle, onResize };
+})();
 
-    /* ── Inlined spring integration (no object allocation) ──────────────
-       Original spring(cur, vel, target, k, d):
-         force = (target - cur) * k
-         vel   = vel * d + force
-         pos   = cur + vel
-       Inlined 3× here (tx, ty, sc) to eliminate 3 object allocs/frame.  */
-    var f;
 
-    f     = (c.ttx - c.tx) * SP_K;
-    c.vx  = c.vx * damp + f;
-    c.tx += c.vx;
+/* ==========================================================================
+   CARD FACTORY — create card DOM element + initial state object
+   ========================================================================== */
 
-    f     = (c.tty - c.ty) * SP_K;
-    c.vy  = c.vy * damp + f;
-    c.ty += c.vy;
+const CardFactory = (() => {
 
-    f     = (c.tsc - c.sc) * SP_K;
-    c.vs  = c.vs * damp + f;
-    c.sc += c.vs;
+  /**
+   * Create a single card element and its associated physics state object.
+   *
+   * @param {string} imagePath  - Pre-encoded image src path.
+   * @param {number} poolIndex  - Index into the display pool (used as lightbox ID).
+   * @param {number} row        - Grid row (0-based), used for z-index and entry delay.
+   * @param {number} col        - Grid column (0-based), used for entry delay.
+   * @returns {{ el: HTMLElement, state: object }}
+   */
+  const create = (imagePath, poolIndex, row, col) => {
+    const baseRotation = CARD_ROTATIONS[
+      Math.floor(Math.random() * CARD_ROTATIONS.length)
+    ];
 
-    c.rz += (c.baseRot - c.rz) * 0.12;
+    /* ── DOM element ── */
+    const cardEl = document.createElement('div');
+    cardEl.className = 'card';
 
-    c.el.style.transform =
-      'translate(' + c.tx.toFixed(1) + 'px,' + c.ty.toFixed(1) + 'px)' +
-      ' rotate(' + c.rz.toFixed(2) + 'deg)' +
-      ' scale(' + c.sc.toFixed(3) + ')';
-  }
+    /* --init-rot is read by the @keyframes cardIn animation so the card
+       enters with the same tilt it will rest at. */
+    cardEl.style.setProperty('--init-rot', `rotate(${baseRotation}deg)`);
+    cardEl.style.height  = GridSystem.cardHeight.toFixed(2) + 'px';
+    cardEl.style.zIndex  = (row + 1) * 2;
 
-  /* Pause the loop when nothing is moving — restarts on next interaction */
-  if (allSleeping) {
-    pausePhysics();
-  } else {
+    /* Staggered entry: each card gets an offset delay based on its position
+       in reading order (left→right within a row, rows top-to-bottom). */
+    const entryDelay =
+      (row * CARD_ENTRY_ROW_STEP + col * CARD_ENTRY_COL_STEP).toFixed(3);
+    cardEl.style.animation =
+      `cardIn ${CARD_ENTRY_DURATION}s ${entryDelay}s cubic-bezier(.22,1,.36,1) both`;
+
+    const img = document.createElement('img');
+    img.decoding = 'async';
+    img.loading  = 'eager';
+    img.onerror  = () => { cardEl.style.background = '#1a1815'; };
+    img.src      = imagePath;
+    cardEl.appendChild(img);
+
+    /* Attach the pool index directly on the element for O(1) click lookup —
+       avoids searching the cards array on every click. */
+    cardEl._poolIdx = poolIndex;
+
+    /* ── Physics state object ── */
+    const cardState = {
+      el:        cardEl,
+      row,
+      baseRotation,
+
+      /* Current physics values (updated every RAF frame) */
+      translateX:   0,
+      translateY:   0,
+      rotationZ:    baseRotation,
+      scale:        1,
+
+      /* Velocity components */
+      velocityX:  0,
+      velocityY:  0,
+      velocityScale: 0,
+
+      /* Target values computed from mouse position each frame */
+      targetTranslateX: 0,
+      targetTranslateY: 0,
+      targetScale:      1,
+
+      /* Rest-position centre in viewport coordinates.
+         Set once the entry animation completes (animationend). */
+      restCenterX: 0,
+      restCenterY: 0,
+
+      /* True once restCenter is known and physics can run. */
+      ready: false,
+
+      /* When sleeping, the card skips all physics computation and DOM
+         writes. Woken automatically when hovered or pushed. */
+      sleeping: false,
+    };
+
+    /* Cache rest-position after entry animation completes — the card has
+       reached its final CSS grid position, so getBoundingClientRect is stable. */
+    cardEl.addEventListener('animationend', () => {
+      const rect            = cardEl.getBoundingClientRect();
+      cardState.restCenterX = rect.left + rect.width  / 2;
+      cardState.restCenterY = rect.top  + rect.height / 2;
+      cardState.ready       = true;
+    });
+
+    return { el: cardEl, state: cardState };
+  };
+
+  return { create };
+})();
+
+
+/* ==========================================================================
+   PHYSICS ENGINE — spring simulation, sleep/wake, RAF loop
+   ========================================================================== */
+
+const PhysicsEngine = (() => {
+
+  let mouseX = -9999;
+  let mouseY = -9999;
+
+  let hoveredCard  = null;
+  let hoverTimer   = null;
+
+  let rafId      = null;
+  let physicsActive = false;
+
+  /* Populated by init() */
+  let cardStates = [];
+
+  /**
+   * Wake the physics loop.
+   * Called on any interaction (mouse move, touch, hover enter).
+   * No-op if the loop is already running.
+   */
+  const wake = () => {
+    if (physicsActive) return;
+    physicsActive = true;
     rafId = requestAnimationFrame(tick);
-  }
-}
+  };
 
-/* Start physics — will auto-pause once all cards are settled */
-wakePhysics();
+  /**
+   * Pause the physics loop.
+   * Called automatically when every card reports sleeping.
+   * Saves CPU when the moodboard is idle.
+   */
+  const pause = () => {
+    physicsActive = false;
+    if (rafId !== null) {
+      cancelAnimationFrame(rafId);
+      rafId = null;
+    }
+  };
 
-/* ── Shine wave ── */
-var SHINE_STEP  = Math.round(6000 / cards.length);
-var SHINE_PAUSE = 5000;
+  /**
+   * Attach mouseenter / mouseleave handlers to a card.
+   *
+   * A 55ms debounce on mouseenter prevents spurious hover triggers when
+   * the cursor passes quickly over a card (e.g. during fast sweeps across
+   * the grid). On leave we immediately clear the hover and reset z-index.
+   */
+  const attachHoverListeners = (cardState) => {
+    cardState.el.addEventListener('mouseenter', () => {
+      clearTimeout(hoverTimer);
+      hoverTimer = setTimeout(() => {
+        hoveredCard = cardState;
+        /* Lift the card above its neighbours while hovered */
+        cardState.el.style.zIndex = (cardState.row + 1) * 2 + 50;
+        wake();
+      }, 55);
+    });
 
-var imgsTotal  = cards.length;
-var imgsLoaded = 0;
-var shineStarted = false;
+    cardState.el.addEventListener('mouseleave', () => {
+      clearTimeout(hoverTimer);
+      if (hoveredCard === cardState) {
+        hoveredCard = null;
+        cardState.el.style.zIndex = (cardState.row + 1) * 2;
+      }
+    });
+  };
 
-function onImgSettled() {
-  if (shineStarted) return;
-  if (++imgsLoaded >= imgsTotal) startShine();
-}
+  /**
+   * Main animation loop.
+   *
+   * Each frame:
+   * 1. For the hovered card, compute the repulsion vector from cursor to
+   *    card centre and set it as the translation target.
+   * 2. Run spring integration for each active card.
+   * 3. Write the resulting transform to the DOM only when the card is awake.
+   * 4. Sleep cards whose velocity + displacement drop below threshold.
+   * 5. Pause the RAF when all cards are sleeping.
+   *
+   * Spring integration (inlined to avoid per-frame object allocation):
+   *   force     = (target - current) * SPRING_STIFFNESS
+   *   velocity  = velocity * damping + force
+   *   position += velocity
+   */
+  const tick = () => {
+    const count      = cardStates.length;
+    let   allSleeping = true;
 
-function startShine() {
-  if (shineStarted) return;
-  shineStarted = true;
-  clearTimeout(shineTimeout);
-  runShineWave();
-}
+    for (let i = 0; i < count; i++) {
+      const cardState = cardStates[i];
+      if (!cardState.ready) { allSleeping = false; continue; }
 
-var shineTimeout = setTimeout(startShine, 6000);
+      const isHovered = (cardState === hoveredCard);
+      const damping   = isHovered ? SPRING_DAMPING_HOVER : SPRING_DAMPING_RETURN;
 
-cards.forEach(function(c) {
-  var img = c.el.querySelector('img');
-  if (!img)                                   { onImgSettled(); return; }
-  if (img.complete && img.naturalWidth > 0)   { onImgSettled(); return; }
-  img.addEventListener('load',  onImgSettled, { once: true });
-  img.addEventListener('error', onImgSettled, { once: true });
-});
+      /* ── Compute repulsion target for the hovered card ──────────────────
+         The push direction is the normalised vector from the cursor to the
+         card's *current* centre (rest position + current translation).
+         Multiplying by PUSH_FORCE gives the target offset in pixels.
+         This makes the card appear to be pushed away from the cursor while
+         it is hovered, with the spring providing organic overshoot. */
+      if (isHovered) {
+        const dx   = (cardState.restCenterX + cardState.translateX) - mouseX;
+        const dy   = (cardState.restCenterY + cardState.translateY) - mouseY;
+        const dist = Math.sqrt(dx * dx + dy * dy);
 
-function runShineWave() {
-  var i = 0;
-  function next() {
-    if (i >= cards.length) {
-      setTimeout(runShineWave, SHINE_PAUSE);
+        if (dist > 0) {
+          cardState.targetTranslateX = (dx / dist) * PUSH_FORCE;
+          cardState.targetTranslateY = (dy / dist) * PUSH_FORCE;
+        }
+
+        cardState.targetScale = 1.10;
+      } else {
+        /* Non-hovered cards always target their rest position (zero offset, unit scale). */
+        cardState.targetTranslateX = 0;
+        cardState.targetTranslateY = 0;
+        cardState.targetScale      = 1;
+      }
+
+      /* ── Sleep check ─────────────────────────────────────────────────────
+         If all velocity components AND all displacement components are
+         within their respective thresholds, snap the card to exact rest
+         and mark it sleeping. Sleeping cards skip ALL physics computation
+         and DOM writes on subsequent frames, saving significant CPU
+         when the board is idle. */
+      if (
+        !isHovered &&
+        cardState.velocityX     > -SLEEP_VELOCITY_THRESHOLD &&
+        cardState.velocityX     <  SLEEP_VELOCITY_THRESHOLD &&
+        cardState.velocityY     > -SLEEP_VELOCITY_THRESHOLD &&
+        cardState.velocityY     <  SLEEP_VELOCITY_THRESHOLD &&
+        cardState.velocityScale > -SLEEP_VELOCITY_THRESHOLD &&
+        cardState.velocityScale <  SLEEP_VELOCITY_THRESHOLD &&
+        cardState.translateX    > -SLEEP_POSITION_THRESHOLD &&
+        cardState.translateX    <  SLEEP_POSITION_THRESHOLD &&
+        cardState.translateY    > -SLEEP_POSITION_THRESHOLD &&
+        cardState.translateY    <  SLEEP_POSITION_THRESHOLD &&
+        cardState.scale         >  1 - SLEEP_POSITION_THRESHOLD &&
+        cardState.scale         <  1 + SLEEP_POSITION_THRESHOLD
+      ) {
+        if (!cardState.sleeping) {
+          /* One final authoritative DOM write before sleeping */
+          cardState.translateX   = 0;
+          cardState.translateY   = 0;
+          cardState.scale        = 1;
+          cardState.velocityX    = 0;
+          cardState.velocityY    = 0;
+          cardState.velocityScale = 0;
+          cardState.rotationZ    = cardState.baseRotation;
+          cardState.el.style.transform = `rotate(${cardState.baseRotation}deg)`;
+          cardState.sleeping = true;
+        }
+        continue; /* skip the rest of the loop body for this card */
+      }
+
+      cardState.sleeping = false;
+      allSleeping        = false;
+
+      /* ── Spring integration: translateX ── */
+      let force              = (cardState.targetTranslateX - cardState.translateX) * SPRING_STIFFNESS;
+      cardState.velocityX    = cardState.velocityX * damping + force;
+      cardState.translateX  += cardState.velocityX;
+
+      /* ── Spring integration: translateY ── */
+      force                  = (cardState.targetTranslateY - cardState.translateY) * SPRING_STIFFNESS;
+      cardState.velocityY    = cardState.velocityY * damping + force;
+      cardState.translateY  += cardState.velocityY;
+
+      /* ── Spring integration: scale ── */
+      force                  = (cardState.targetScale - cardState.scale) * SPRING_STIFFNESS;
+      cardState.velocityScale = cardState.velocityScale * damping + force;
+      cardState.scale        += cardState.velocityScale;
+
+      /* Rotation drifts back to base tilt using a simple lerp (12% per frame).
+         Not a full spring — just enough to smooth out any accumulated drift. */
+      cardState.rotationZ += (cardState.baseRotation - cardState.rotationZ) * 0.12;
+
+      /* ── DOM write (single style.transform per card per frame) ── */
+      cardState.el.style.transform =
+        `translate(${cardState.translateX.toFixed(1)}px, ${cardState.translateY.toFixed(1)}px)` +
+        ` rotate(${cardState.rotationZ.toFixed(2)}deg)` +
+        ` scale(${cardState.scale.toFixed(3)})`;
+    }
+
+    /* Auto-pause: when every card is sleeping there is nothing to animate.
+       The loop restarts automatically on the next mouse/touch event. */
+    if (allSleeping) {
+      pause();
+    } else {
+      rafId = requestAnimationFrame(tick);
+    }
+  };
+
+  /** Initialise the engine with the list of card state objects. */
+  const init = (states) => {
+    cardStates = states;
+
+    window.addEventListener('mousemove', (e) => {
+      mouseX = e.clientX;
+      mouseY = e.clientY;
+      wake();
+    });
+
+    window.addEventListener('mouseleave', () => {
+      mouseX = -9999;
+      mouseY = -9999;
+      clearTimeout(hoverTimer);
+      hoveredCard = null;
+      /* Do NOT pause here — let cards finish returning to rest. */
+    });
+
+    /* Touch repel: treat the first touch point as the "mouse" */
+    window.addEventListener('touchmove', (e) => {
+      mouseX = e.touches[0].clientX;
+      mouseY = e.touches[0].clientY;
+      wake();
+    }, { passive: true });
+
+    window.addEventListener('touchend', () => {
+      mouseX = -9999;
+      mouseY = -9999;
+    });
+
+    wake();
+  };
+
+  return { init, attachHoverListeners, wake };
+})();
+
+
+/* ==========================================================================
+   SHINE ANIMATOR — sequential highlight wave across all cards
+   ========================================================================== */
+
+const ShineAnimator = (() => {
+
+  /** Milliseconds between individual card shine triggers. */
+  const computeStepInterval = (totalCards) => Math.round(6000 / totalCards);
+
+  /** Milliseconds to wait before repeating the wave. */
+  const WAVE_PAUSE_MS = 5000;
+
+  let cardList     = [];
+  let stepInterval = 0;
+  let waveTimeout  = null;
+  let started      = false;
+  let loadedCount  = 0;
+
+  /**
+   * Trigger the shine CSS class on cards one-by-one, then wait WAVE_PAUSE_MS
+   * before starting the next wave. The class is removed after 950ms so the
+   * ::after pseudo-element's animation can complete and reset cleanly.
+   *
+   * Sequential recursion via setTimeout keeps each step off the main
+   * thread queue and prevents blocking frame rendering.
+   */
+  const runWave = () => {
+    let index = 0;
+
+    const stepNext = () => {
+      if (index >= cardList.length) {
+        waveTimeout = setTimeout(runWave, WAVE_PAUSE_MS);
+        return;
+      }
+
+      const cardState = cardList[index++];
+
+      /* Only animate cards that have completed their entry animation
+         and are not already mid-shine. */
+      if (cardState.ready && !cardState.el.classList.contains('shine')) {
+        cardState.el.classList.add('shine');
+        setTimeout(() => cardState.el.classList.remove('shine'), 950);
+      }
+
+      setTimeout(stepNext, stepInterval);
+    };
+
+    stepNext();
+  };
+
+  /**
+   * Start the shine wave (idempotent — safe to call multiple times).
+   * Called once all images have loaded, or after a 6-second fallback timeout.
+   */
+  const start = () => {
+    if (started) return;
+    started = true;
+    clearTimeout(waveTimeout);
+    runWave();
+  };
+
+  /**
+   * Called when an image either loads or errors.
+   * Starts the wave once every image has settled.
+   */
+  const onImageSettled = () => {
+    if (started) return;
+    if (++loadedCount >= cardList.length) start();
+  };
+
+  /** Register cards and attach load/error listeners to their images. */
+  const init = (states) => {
+    cardList     = states;
+    stepInterval = computeStepInterval(cardList.length);
+
+    /* Fallback: start the shine wave after 6 seconds regardless of image
+       load state — prevents the wave from never playing if images are slow. */
+    waveTimeout = setTimeout(start, 6000);
+
+    for (const cardState of cardList) {
+      const img = cardState.el.querySelector('img');
+      if (!img)                                 { onImageSettled(); continue; }
+      if (img.complete && img.naturalWidth > 0) { onImageSettled(); continue; }
+      img.addEventListener('load',  onImageSettled, { once: true });
+      img.addEventListener('error', onImageSettled, { once: true });
+    }
+  };
+
+  return { init };
+})();
+
+
+/* ==========================================================================
+   LIGHTBOX — full-screen image viewer with navigation + animations
+   ========================================================================== */
+
+const Lightbox = (() => {
+
+  let currentIndex = -1;
+  let totalCount   = 0;
+  let poolPaths    = [];
+
+  /** Write "N / total" into the counter element. */
+  const updateCounter = () => {
+    lbCounterEl.textContent = `${currentIndex + 1} / ${totalCount}`;
+  };
+
+  /**
+   * Open the lightbox to a specific pool index.
+   * No-op if already open (prevents double-open from rapid clicks).
+   */
+  const open = (poolIndex) => {
+    if (lightboxEl.classList.contains('on')) return;
+    currentIndex      = poolIndex;
+    lbImgEl.src       = poolPaths[poolIndex];
+    lbFrameEl.className = 'lb-frame anim-open';
+    lightboxEl.classList.add('on');
+    updateCounter();
+  };
+
+  /**
+   * Navigate the lightbox by `direction` steps (+1 = next, -1 = prev).
+   *
+   * Animation classes are re-applied by:
+   * 1. Stripping all animation classes.
+   * 2. Reading offsetWidth to force a style recalculation (reflow) — this
+   *    resets the animation to its initial state so it re-triggers on the
+   *    next class add. `void` prevents the expression being optimised away.
+   * 3. Adding the directional animation class.
+   *
+   * Direction convention: anim-l = new image slides in from right (forward),
+   *                        anim-r = new image slides in from left (backward).
+   */
+  const navigate = (direction) => {
+    currentIndex = (currentIndex + direction + totalCount) % totalCount;
+
+    lbFrameEl.className = 'lb-frame';
+    void lbFrameEl.offsetWidth; // forced reflow to reset animation
+    lbFrameEl.className = `lb-frame ${direction > 0 ? 'anim-l' : 'anim-r'}`;
+
+    lbImgEl.src = poolPaths[currentIndex];
+    updateCounter();
+  };
+
+  /** Close the lightbox and defer clearing the src to allow fade-out. */
+  const close = () => {
+    lightboxEl.classList.remove('on');
+    setTimeout(() => { lbImgEl.src = ''; }, 300);
+  };
+
+  /** Wire up all lightbox controls and event listeners. */
+  const init = (paths, count) => {
+    poolPaths  = paths;
+    totalCount = count;
+
+    /* Click on the backdrop (not the image frame) closes the lightbox */
+    lightboxEl.addEventListener('click', (e) => {
+      if (e.target === lightboxEl) close();
+    });
+
+    document.getElementById('lb-close').addEventListener('click', close);
+
+    document.getElementById('lb-prev').addEventListener('click', (e) => {
+      e.stopPropagation();
+      navigate(-1);
+    });
+
+    document.getElementById('lb-next').addEventListener('click', (e) => {
+      e.stopPropagation();
+      navigate(1);
+    });
+
+    /* Keyboard navigation */
+    document.addEventListener('keydown', (e) => {
+      if (!lightboxEl.classList.contains('on')) return;
+      if (e.key === 'ArrowLeft')  navigate(-1);
+      if (e.key === 'ArrowRight') navigate(1);
+      if (e.key === 'Escape')     close();
+    });
+
+    /* Touch swipe: record start X on touchstart, compare on touchend.
+       A swipe of ≥48px triggers navigation. */
+    let swipeStartX = 0;
+    lightboxEl.addEventListener('touchstart', (e) => {
+      swipeStartX = e.touches[0].clientX;
+    }, { passive: true });
+
+    lightboxEl.addEventListener('touchend', (e) => {
+      const deltaX = e.changedTouches[0].clientX - swipeStartX;
+      if (Math.abs(deltaX) > 48) navigate(deltaX < 0 ? 1 : -1);
+    });
+  };
+
+  return { init, open };
+})();
+
+
+/* ==========================================================================
+   WELCOME OVERLAY — shown on first visit, dismissed on first click
+   ========================================================================== */
+
+const WelcomeOverlay = (() => {
+
+  const STORAGE_KEY = 'mb_seen';
+
+  const init = () => {
+    if (!welcomeEl) return;
+
+    /* Skip the overlay entirely if the user has visited before */
+    if (localStorage.getItem(STORAGE_KEY)) {
+      welcomeEl.style.display = 'none';
       return;
     }
-    var c = cards[i++];
-    if (c.ready && !c.el.classList.contains('shine')) {
-      c.el.classList.add('shine');
-      setTimeout(function() { c.el.classList.remove('shine'); }, 950);
-    }
-    setTimeout(next, SHINE_STEP);
-  }
-  next();
-}
 
-/* ── Grid click (delegated) ── */
-grid.addEventListener('click', function(e) {
-  if (lb.classList.contains('on')) return;
-  var cardEl = e.target.closest('.card');
-  if (!cardEl) return;
-  openLb(cardEl._poolIdx);
-});
+    /* Dismiss on first click anywhere in the document */
+    const dismiss = () => {
+      localStorage.setItem(STORAGE_KEY, '1');
+      welcomeEl.classList.add('hidden');
+      setTimeout(() => { welcomeEl.style.display = 'none'; }, 520);
+      document.removeEventListener('click', dismiss);
+    };
 
-/* ── Lightbox ── */
-function updateCounter() {
-  lbCounter.textContent = (currentIdx + 1) + ' / ' + COUNT;
-}
+    document.addEventListener('click', dismiss);
+  };
 
-function openLb(idx) {
-  if (lb.classList.contains('on')) return;
-  currentIdx = idx;
-  lbImg.src  = poolPaths[idx]; /* pre-encoded path — no runtime encodeURIComponent */
-  lbFrame.className = 'lb-frame anim-open';
-  lb.classList.add('on');
-  updateCounter();
-}
+  return { init };
+})();
 
-function lbNavigate(dir) {
-  currentIdx = (currentIdx + dir + COUNT) % COUNT;
-  lbFrame.className = 'lb-frame';
-  void lbFrame.offsetWidth;
-  lbFrame.className = 'lb-frame ' + (dir > 0 ? 'anim-l' : 'anim-r');
-  lbImg.src = poolPaths[currentIdx]; /* pre-encoded */
-  updateCounter();
-}
 
-function closeLb() {
-  lb.classList.remove('on');
-  setTimeout(function() { lbImg.src = ''; }, 300);
-}
+/* ==========================================================================
+   ORBIT TEXT FITTER — adjusts letter-spacing so the text exactly fills
+   the circular SVG path on the welcome screen
+   ========================================================================== */
 
-lb.addEventListener('click', function(e) { if (e.target === lb) closeLb(); });
-document.getElementById('lb-close').addEventListener('click', closeLb);
-document.getElementById('lb-prev').addEventListener('click', function(e) {
-  e.stopPropagation(); lbNavigate(-1);
-});
-document.getElementById('lb-next').addEventListener('click', function(e) {
-  e.stopPropagation(); lbNavigate(1);
-});
+const OrbitTextFitter = (() => {
 
-document.addEventListener('keydown', function(e) {
-  if (!lb.classList.contains('on')) return;
-  if (e.key === 'ArrowLeft')  lbNavigate(-1);
-  if (e.key === 'ArrowRight') lbNavigate(1);
-  if (e.key === 'Escape')     closeLb();
-});
+  /**
+   * Fit the orbit text string to the circle's circumference.
+   *
+   * The SVG <textPath> element uses a circle with radius 260px.
+   * We compute the circle's circumference (2πr), measure the natural rendered
+   * length of the text, then distribute the leftover space evenly between
+   * characters as letter-spacing.
+   *
+   * This is done once at startup. The SVG is static, so no resize recalc
+   * is needed.
+   */
+  const fit = () => {
+    const textPathEl = document.getElementById('orbit-text');
+    if (!textPathEl) return;
 
-var swipeX = 0;
-lb.addEventListener('touchstart', function(e) { swipeX = e.touches[0].clientX; }, {passive: true});
-lb.addEventListener('touchend',   function(e) {
-  var dx = e.changedTouches[0].clientX - swipeX;
-  if (Math.abs(dx) > 48) lbNavigate(dx < 0 ? 1 : -1);
-});
+    const ORBIT_RADIUS     = 260; // matches the SVG path radius
+    const circumference    = 2 * Math.PI * ORBIT_RADIUS;
+    const naturalTextLength = textPathEl.getComputedTextLength();
+    const charCount        = textPathEl.textContent.length;
+    const letterSpacing    = (circumference - naturalTextLength) / charCount;
 
-/* ── Welcome ── */
-var welcome = document.getElementById('welcome');
-if (localStorage.getItem('mb_seen')) {
-  welcome.style.display = 'none';
-} else {
-  document.addEventListener('click', function dismiss() {
-    localStorage.setItem('mb_seen', '1');
-    welcome.classList.add('hidden');
-    setTimeout(function() { welcome.style.display = 'none'; }, 520);
-    document.removeEventListener('click', dismiss);
+    textPathEl.parentElement.setAttribute('letter-spacing', letterSpacing.toFixed(4));
+  };
+
+  return { fit };
+})();
+
+
+/* ==========================================================================
+   BOOTSTRAP — wire all systems together and populate the grid
+   ========================================================================== */
+
+(() => {
+
+  /* ── 1. Apply grid layout ── */
+  GridSystem.applyGridStyle();
+
+  /* ── 2. Build image pool ── */
+  const pool      = GridSystem.buildPool();
+  const poolPaths = pool.map(f => `images/${encodeURIComponent(f)}`);
+
+  /* ── 3. Create cards ── */
+  const cardStates = [];
+
+  pool.forEach((filename, poolIndex) => {
+    const row = Math.floor(poolIndex / GridSystem.columnCount);
+    const col = poolIndex % GridSystem.columnCount;
+
+    const { el, state } = CardFactory.create(poolPaths[poolIndex], poolIndex, row, col);
+
+    gridEl.appendChild(el);
+    cardStates.push(state);
+
+    PhysicsEngine.attachHoverListeners(state);
   });
-}
 
-/* Touch repel */
-window.addEventListener('touchmove', function(e) {
-  mx = e.touches[0].clientX; my = e.touches[0].clientY;
-  wakePhysics();
-}, {passive: true});
-window.addEventListener('touchend', function() { mx = -9999; my = -9999; });
+  /* ── 4. Grid click — delegated to the grid element ────────────────────
+     Rather than attaching a click listener to every card, we attach one
+     listener to the grid and use closest('.card') to find the target card.
+     _poolIdx gives us the lightbox index in O(1) without searching the array. */
+  gridEl.addEventListener('click', (e) => {
+    if (lightboxEl.classList.contains('on')) return;
+    const cardEl = e.target.closest('.card');
+    if (!cardEl) return;
+    Lightbox.open(cardEl._poolIdx);
+  });
 
-/* ── Orbit text fit ── */
-(function fitOrbit() {
-  var tp = document.getElementById('orbit-text');
-  if (!tp) return;
-  var circ = 2 * Math.PI * 260;
-  var nat  = tp.getComputedTextLength();
-  var n    = tp.textContent.length;
-  var ls   = (circ - nat) / n;
-  tp.parentElement.setAttribute('letter-spacing', ls.toFixed(4));
+  /* ── 5. Initialise subsystems ── */
+  PhysicsEngine.init(cardStates);
+  ShineAnimator.init(cardStates);
+  Lightbox.init(poolPaths, GridSystem.cardCount);
+  WelcomeOverlay.init();
+  OrbitTextFitter.fit();
+
+  /* ── 6. Resize handler ── */
+  window.addEventListener('resize', () => GridSystem.onResize(cardStates));
+
 })();
 </script>
 </body>
