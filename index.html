@@ -39,6 +39,24 @@ html, body {
   row-gap: 0;
 }
 
+/* Fallback hint — sits behind all cards, visible only if images fail to load */
+.grid-fallback {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  font-family: monospace;
+  font-size: clamp(.7rem, 1.4vw, .95rem);
+  letter-spacing: .12em;
+  color: #2a2927;
+  text-align: center;
+  padding: 2rem;
+  line-height: 2;
+}
+
 
 /* ==========================================================================
    CARD — layout, image, hover physics target
@@ -185,7 +203,7 @@ body::after {
   justify-content: center;
   border-radius: 14px;
   overflow: hidden;
-  /* Size is determined by the image inside */
+  /* size is determined by the image inside */
   flex-shrink: 1;
   min-width: 0;
   min-height: 0;
@@ -195,7 +213,7 @@ body::after {
   display: block;
   width:  auto;
   height: auto;
-  /* Constrained directly via viewport — does not depend on parent */
+  /* constrained directly via viewport — does not depend on parent */
   max-width:  calc(100vw - 6.4rem);
   max-height: calc(100vh - 7.2rem);
   object-fit: contain;
@@ -338,6 +356,28 @@ body::after {
 
 
 /* ==========================================================================
+   FALLBACK HINT — shown behind cards when images fail to load
+   ========================================================================== */
+
+.fallback-hint {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-family: monospace;
+  font-size: clamp(.7rem, 1.4vw, 1rem);
+  line-height: 2;
+  letter-spacing: .12em;
+  color: #2a2927;
+  pointer-events: none;
+  user-select: none;
+}
+
+
+/* ==========================================================================
    RESPONSIVE OVERRIDES
    ========================================================================== */
 
@@ -388,8 +428,17 @@ body::after {
 
 
 <!-- =========================================================================
+     FALLBACK HINT — visible behind cards if images fail to load
+     ========================================================================= -->
+<div class="fallback-hint">
+  if nothing is here —<br>try refreshing the page
+</div>
+
+
+<!-- =========================================================================
      MOODBOARD GRID  (populated by GridSystem.init())
      ========================================================================= -->
+<div class="grid-fallback">if nothing is here —<br>try refreshing the page</div>
 <div class="grid" id="grid"></div>
 
 
