@@ -1234,13 +1234,18 @@ const OrbitTextFitter = (() => {
   const init = () => {
     fit();
 
-    // Orientation change fires before the browser finishes re-layout, so
-    // getComputedTextLength() would still return 0 at that instant.
-    // A small delay lets the viewport settle before we measure.
-    const fitDeferred = () => setTimeout(fit, 100);
+    // Both screen.orientation 'change' and window 'orientationchange' may fire
+    // on the same rotation (modern iOS Safari triggers both). Guard with a
+    // pending flag so fit() runs exactly once per physical rotation, after
+    // the viewport has settled.
+    let pending = false;
+    const fitDeferred = () => {
+      if (pending) return;
+      pending = true;
+      setTimeout(() => { fit(); pending = false; }, 200);
+    };
 
     screen.orientation?.addEventListener('change', fitDeferred);
-    // Fallback for Safari < 16.4 which lacks the ScreenOrientation API
     window.addEventListener('orientationchange', fitDeferred);
   };
 
