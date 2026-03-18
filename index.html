@@ -1173,6 +1173,10 @@ const WelcomeOverlay = (() => {
    ORBIT TEXT FITTER
    Computes the number of phrase repetitions needed to fill the circumference,
    then fine-tunes letter-spacing so the text wraps exactly once around.
+   Re-runs on orientation change: on mobile portrait the SVG is hidden
+   (display:none via CSS), so getComputedTextLength() returns 0 and the
+   initial fit() is skipped. When the user rotates to landscape the SVG
+   becomes visible — the orientationchange listener fires fit() again.
    ========================================================================== */
 
 const OrbitTextFitter = (() => {
@@ -1186,26 +1190,39 @@ const OrbitTextFitter = (() => {
 
     const circumference = 2 * Math.PI * ORBIT_RADIUS;
 
-    // 1. Measure a single phrase at natural (zero extra) spacing
+    // 1. Measure a single phrase at natural (zero extra) spacing.
+    //    Reset letter-spacing first so repeated calls don't compound.
+    textPath.parentElement.setAttribute('letter-spacing', '0');
     textPath.textContent = PHRASE;
     const phraseLength = textPath.getComputedTextLength();
-    if (phraseLength === 0) return;   // element hidden (mobile) → skip
 
-    // 2. Fill the circle: ceil repetitions so text slightly overflows,
-    //    then letter-spacing will compress it back to exactly circumference.
+    // Element is hidden (portrait mobile) — nothing to measure yet.
+    if (phraseLength === 0) return;
+
+    // 2. Fill the circle: ceil repetitions ensures slight overflow,
+    //    then letter-spacing compresses it to exactly circumference.
     const reps    = Math.ceil(circumference / phraseLength);
     const content = PHRASE.repeat(reps);
     textPath.textContent = content;
 
-    // 3. Fine-tune: distribute remaining/excess space across all characters
+    // 3. Distribute remaining space evenly across all characters.
     const totalLength   = textPath.getComputedTextLength();
-    const charCount     = content.length;
-    const letterSpacing = (circumference - totalLength) / charCount;
+    const letterSpacing = (circumference - totalLength) / content.length;
 
     textPath.parentElement.setAttribute('letter-spacing', letterSpacing.toFixed(4));
   };
 
-  return { fit };
+  const init = () => {
+    fit();
+
+    // Re-fit when the device rotates: the SVG may transition from hidden
+    // (portrait) to visible (landscape) or change its rendered size.
+    screen.orientation?.addEventListener('change', fit);
+    // Fallback for Safari < 16.4 which lacks the ScreenOrientation API
+    window.addEventListener('orientationchange', fit);
+  };
+
+  return { init };
 })();
 
 
@@ -1250,7 +1267,7 @@ const bootstrap = () => {
 
   Lightbox.init(poolPaths, GridSystem.cardCount);
   WelcomeOverlay.init();
-  OrbitTextFitter.fit();
+  OrbitTextFitter.init();
 };
 
 bootstrap();
