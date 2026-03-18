@@ -407,7 +407,7 @@ body::after {
 <!-- =========================================================================
      WELCOME OVERLAY
      ========================================================================= -->
-<div class="welcome" id="welcome">
+<div class="welcome" id="welcome" style="display:none">
   <div class="welcome-text">
     hey! this is my moodboard,<br>
     feel free to browse<br>
@@ -1150,10 +1150,10 @@ const WelcomeOverlay = (() => {
   const init = () => {
     if (!DOM.welcome) return;
 
-    if (storage.get(STORAGE_KEY)) {
-      DOM.welcome.style.display = 'none';
-      return;
-    }
+    if (storage.get(STORAGE_KEY)) return; // element stays display:none
+
+    // First-time visitor — make it visible, then attach dismiss handler
+    DOM.welcome.style.display = '';
 
     const dismiss = () => {
       storage.set(STORAGE_KEY, '1');
