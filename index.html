@@ -1031,9 +1031,10 @@ const PhysicsEngine = (() => {
 
 const Lightbox = (() => {
 
-  let currentIndex = -1;
-  let totalCount   = 0;
-  let poolPaths    = [];
+  let currentIndex  = -1;
+  let totalCount    = 0;
+  let poolPaths     = [];
+  let clearSrcTimer = null;   // tracks the deferred src-clear from close()
 
   const isOpen = () => DOM.lightbox.classList.contains('on');
 
@@ -1054,15 +1055,21 @@ const Lightbox = (() => {
 
   const open = (poolIndex) => {
     if (isOpen()) return;
-    currentIndex           = poolIndex;
-    DOM.lbImg.src          = poolPaths[poolIndex];
-    DOM.lbFrame.className  = 'lb-frame anim-open';
+
+    // If close() left a pending src-clear timer, cancel it before it
+    // fires and blanks out the image we are about to display.
+    clearTimeout(clearSrcTimer);
+    clearSrcTimer = null;
+
+    currentIndex          = poolIndex;
+    DOM.lbImg.src         = poolPaths[poolIndex];
+    DOM.lbFrame.className = 'lb-frame anim-open';
     DOM.lightbox.classList.add('on');
     updateCounter();
   };
 
   const navigate = (direction) => {
-    currentIndex = (currentIndex + direction + totalCount) % totalCount;
+    currentIndex  = (currentIndex + direction + totalCount) % totalCount;
     playFrameAnimation(direction > 0 ? 'anim-l' : 'anim-r');
     DOM.lbImg.src = poolPaths[currentIndex];
     updateCounter();
@@ -1070,7 +1077,13 @@ const Lightbox = (() => {
 
   const close = () => {
     DOM.lightbox.classList.remove('on');
-    setTimeout(() => { DOM.lbImg.src = ''; }, 300);
+    // Defer src clear so the fade-out animation finishes before the image
+    // disappears. Store the timer id so open() can cancel it if the user
+    // reopens the lightbox before the delay elapses.
+    clearSrcTimer = setTimeout(() => {
+      DOM.lbImg.src = '';
+      clearSrcTimer = null;
+    }, 300);
   };
 
   const init = (paths, count) => {
