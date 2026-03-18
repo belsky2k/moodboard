@@ -61,23 +61,6 @@ html, body {
   row-gap: 0;
 }
 
-.grid-fallback {
-  position: fixed;
-  inset: 0;
-  z-index: var(--z-grid);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  pointer-events: none;
-  font-family: var(--font-mono);
-  font-size: clamp(.7rem, 1.4vw, .95rem);
-  letter-spacing: .12em;
-  color: #2a2927;
-  text-align: center;
-  padding: 2rem;
-  line-height: 2;
-  user-select: none;
-}
 
 
 /* ==========================================================================
@@ -447,7 +430,6 @@ body::after {
 <!-- =========================================================================
      MOODBOARD GRID
      ========================================================================= -->
-<div class="grid-fallback">if nothing is here —<br>try refreshing the page</div>
 <div class="grid" id="grid"></div>
 
 
@@ -701,10 +683,11 @@ const GridSystem = (() => {
 
 /* ==========================================================================
    LAZY IMAGE LOADER
-   Uses IntersectionObserver to defer src assignment until the card element
-   is about to enter the viewport. For a fixed full-screen grid all cards
-   are in view immediately, but the async callback lets the browser schedule
-   and prioritise network requests rather than firing all 36 in one tick.
+   Observes each .card element (which is already in the DOM when observe()
+   is called from bootstrap, after appendChild). When a card enters the
+   viewport the observer assigns data-src → src on its <img> child, letting
+   the browser schedule and prioritise requests rather than firing all at once.
+   rootMargin: '100px' starts loading slightly before the card is fully visible.
    ========================================================================== */
 
 const LazyImageLoader = (() => {
@@ -712,21 +695,21 @@ const LazyImageLoader = (() => {
   const observer = new IntersectionObserver((entries, obs) => {
     for (const entry of entries) {
       if (!entry.isIntersecting) continue;
-      const img = entry.target;
-      img.src = img.dataset.src;
-      obs.unobserve(img);
+      const card = entry.target;
+      const img  = card.querySelector('img');
+      if (img?.dataset.src) {
+        img.src = img.dataset.src;
+        delete img.dataset.src;
+      }
+      obs.unobserve(card);
     }
-  }, {
-    rootMargin: '100px',  // start loading slightly before the card is visible
-  });
+  }, { rootMargin: '100px' });
 
-  /** Queue an <img> element for lazy loading via its data-src attribute. */
-  const observe = (img) => observer.observe(img);
+  /** Queue a .card element for lazy image loading. Call after appendChild. */
+  const observe = (cardEl) => observer.observe(cardEl);
 
   return { observe };
 })();
-
-
 
 
 /* ==========================================================================
@@ -758,14 +741,13 @@ const CardFactory = (() => {
     el.style.height = GridSystem.getCardHeight().toFixed(2) + 'px';
     el.style.zIndex = (row + 1) * 2;
 
-    // Store src in data-src; LazyImageLoader will assign it to src
-    // once the element intersects the viewport.
+    // src is stored in data-src; LazyImageLoader.observe() is called in
+    // bootstrap after appendChild, so the element is already in the DOM.
     const img = document.createElement('img');
     img.decoding    = 'async';
     img.dataset.src = imagePath;
     img.onerror     = () => { el.style.background = '#1a1815'; };
     el.appendChild(img);
-    LazyImageLoader.observe(img);
 
     // --- Staggered entry animation ---
     const entryDelay = (row * CARD_ENTRY_ROW_STEP + col * CARD_ENTRY_COL_STEP).toFixed(3);
@@ -1220,6 +1202,7 @@ const bootstrap = () => {
     DOM.grid.appendChild(el);
     cardStates.push(state);
     PhysicsEngine.attachHoverListeners(state);
+    LazyImageLoader.observe(el);  // must be after appendChild — observer needs el in the DOM
   }
 
   // Delegated click — one listener on the grid rather than one per card
