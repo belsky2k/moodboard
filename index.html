@@ -1215,11 +1215,14 @@ const OrbitTextFitter = (() => {
   const init = () => {
     fit();
 
-    // Re-fit when the device rotates: the SVG may transition from hidden
-    // (portrait) to visible (landscape) or change its rendered size.
-    screen.orientation?.addEventListener('change', fit);
+    // Orientation change fires before the browser finishes re-layout, so
+    // getComputedTextLength() would still return 0 at that instant.
+    // A small delay lets the viewport settle before we measure.
+    const fitDeferred = () => setTimeout(fit, 100);
+
+    screen.orientation?.addEventListener('change', fitDeferred);
     // Fallback for Safari < 16.4 which lacks the ScreenOrientation API
-    window.addEventListener('orientationchange', fit);
+    window.addEventListener('orientationchange', fitDeferred);
   };
 
   return { init };
