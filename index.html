@@ -637,41 +637,60 @@ const GridSystem = (() => {
   };
 
   /**
+   * Apply the current rowHeight to the grid and every card element.
+   * Separated so both ResizeObserver and the orientation handler can call it.
+   */
+  const applyHeights = (cards, onCenterUpdate) => {
+    DOM.grid.style.gridTemplateRows = `repeat(${rowCount}, ${rowHeight.toFixed(2)}px)`;
+    for (const state of cards) {
+      state.el.style.height = cardHeight.toFixed(2) + 'px';
+    }
+    for (const state of cards) {
+      if (!state.ready) continue;
+      const { x, y } = computeNaturalCenter(state.col, state.row);
+      onCenterUpdate(state, x, y);
+    }
+  };
+
+  /**
    * Observe viewport-size changes with ResizeObserver.
-   * Unlike window 'resize', ResizeObserver does not fire when the on-screen
-   * keyboard appears on mobile (which only changes the visual viewport, not
-   * the layout viewport that the grid is anchored to).
-   *
-   * Batch-writes all DOM changes, then recomputes physics rest centres via
-   * pure geometry — no DOM reads inside the card loop.
+   * Also listens to orientationchange with a short delay — iOS Safari does not
+   * reliably fire ResizeObserver on rotate-back-to-portrait.
    *
    * @param {object[]} cards
    * @param {(state: object, x: number, y: number) => void} onCenterUpdate
    */
   const observeResize = (cards, onCenterUpdate) => {
-    const ro = new ResizeObserver((entries) => {
-      const newHeight = entries[0].contentRect.height;
+    const handleResize = (newWidth, newHeight) => {
       if (Math.abs(newHeight - viewportHeight) < 2) return;
 
       viewportHeight = newHeight;
       rowHeight      = viewportHeight / (rowCount + 2);
       cardHeight     = rowHeight * 3;
 
-      // 1. Batch all DOM writes
-      DOM.grid.style.gridTemplateRows = `repeat(${rowCount}, ${rowHeight.toFixed(2)}px)`;
-      for (const state of cards) {
-        state.el.style.height = cardHeight.toFixed(2) + 'px';
-      }
+      applyHeights(cards, onCenterUpdate);
+    };
 
-      // 2. Update physics rest centres — pure geometry, no reflow
-      for (const state of cards) {
-        if (!state.ready) continue;
-        const { x, y } = computeNaturalCenter(state.col, state.row);
-        onCenterUpdate(state, x, y);
-      }
+    const ro = new ResizeObserver((entries) => {
+      const { width, height } = entries[0].contentRect;
+      handleResize(width, height);
     });
-
     ro.observe(document.documentElement);
+
+    // Fallback for iOS Safari which may not re-fire ResizeObserver on
+    // rotate-back-to-portrait. The 200 ms delay lets the viewport settle.
+    // Force=true bypasses the <2px guard — after a rotation the stored
+    // viewportHeight may already equal the new value if ResizeObserver
+    // fired correctly, so we recalculate unconditionally to be safe.
+    const onOrientationChange = () => setTimeout(() => {
+      viewportHeight = window.innerHeight;
+      rowHeight      = viewportHeight / (rowCount + 2);
+      cardHeight     = rowHeight * 3;
+      applyHeights(cards, onCenterUpdate);
+    }, 200);
+
+    screen.orientation?.addEventListener('change', onOrientationChange);
+    window.addEventListener('orientationchange', onOrientationChange);
   };
 
   return {
