@@ -166,12 +166,14 @@ body::after {
 
   /* Safe-area insets for notched devices */
   padding-top:    max(3.2rem, env(safe-area-inset-top,    0px));
-  padding-bottom: max(2.4rem, env(safe-area-inset-bottom, 0px));
+  padding-bottom: max(3.6rem, env(safe-area-inset-bottom, 0px));
   padding-left:   max(3.2rem, env(safe-area-inset-left,   0px));
   padding-right:  max(3.2rem, env(safe-area-inset-right,  0px));
 
+  flex-direction: column;
   align-items:     center;
   justify-content: center;
+  gap: .8rem;
   cursor: default;
 }
 
@@ -193,8 +195,12 @@ body::after {
   display: block;
   width:  auto;
   height: auto;
-  max-width:  calc(100vw - 6.4rem);
-  max-height: calc(100vh - 7.2rem);
+  /* vh fallback first; dvh overrides it in browsers that support it.
+     dvh tracks the visible viewport correctly after rotation/keyboard pop.
+     The 8rem budget: 3.2rem top + 3.6rem bottom padding + counter row. */
+  max-width:  calc(100vw  - 6.4rem);
+  max-height: calc(100vh  - 8rem);
+  max-height: calc(100dvh - 8rem);
   object-fit: contain;
   filter: contrast(1.06) saturate(0.85);
   border-radius: 14px;
@@ -240,16 +246,14 @@ body::after {
 .lb-arrow-r       { right: .5rem; }
 
 .lb-counter {
-  position: fixed;
-  bottom: 1.4rem;
-  left: 50%;
-  transform: translateX(-50%);
+  flex-shrink: 0;
   font-family: var(--font-mono);
   font-size: .68rem;
   letter-spacing: .14em;
   color: #3a3a3a;
   z-index: var(--z-lb-ctrl);
   pointer-events: none;
+  text-align: center;
 }
 
 
@@ -418,9 +422,7 @@ body::after {
           d="M 300,300 m -260,0 a 260,260 0 1,1 520,0 a 260,260 0 1,1 -520,0"/>
       </defs>
       <text font-family="monospace" font-size="14" fill="#3D3B38">
-        <textPath id="orbit-text" href="#orbitPath" startOffset="0%">
-          a new selection every refresh · a new selection every refresh · a new selection every refresh · a new selection every refresh ·
-        </textPath>
+        <textPath id="orbit-text" href="#orbitPath" startOffset="0%"></textPath>
       </text>
     </svg>
   </div>
@@ -1156,23 +1158,36 @@ const WelcomeOverlay = (() => {
 
 /* ==========================================================================
    ORBIT TEXT FITTER
-   Distributes text evenly around the circular SVG path by computing the
-   letter-spacing needed to fill the full circumference.
+   Computes the number of phrase repetitions needed to fill the circumference,
+   then fine-tunes letter-spacing so the text wraps exactly once around.
    ========================================================================== */
 
 const OrbitTextFitter = (() => {
 
-  const ORBIT_RADIUS = 260; // must match the SVG path radius
+  const ORBIT_RADIUS = 260;           // must match SVG path radius
+  const PHRASE       = 'a new selection every refresh · ';
 
   const fit = () => {
     const textPath = document.getElementById('orbit-text');
     if (!textPath) return;
 
-    const textLength = textPath.getComputedTextLength();
-    if (textLength === 0) return;       // hidden on mobile → skip to avoid divide-by-zero
-
     const circumference = 2 * Math.PI * ORBIT_RADIUS;
-    const letterSpacing = (circumference - textLength) / textPath.textContent.length;
+
+    // 1. Measure a single phrase at natural (zero extra) spacing
+    textPath.textContent = PHRASE;
+    const phraseLength = textPath.getComputedTextLength();
+    if (phraseLength === 0) return;   // element hidden (mobile) → skip
+
+    // 2. Fill the circle: ceil repetitions so text slightly overflows,
+    //    then letter-spacing will compress it back to exactly circumference.
+    const reps    = Math.ceil(circumference / phraseLength);
+    const content = PHRASE.repeat(reps);
+    textPath.textContent = content;
+
+    // 3. Fine-tune: distribute remaining/excess space across all characters
+    const totalLength   = textPath.getComputedTextLength();
+    const charCount     = content.length;
+    const letterSpacing = (circumference - totalLength) / charCount;
 
     textPath.parentElement.setAttribute('letter-spacing', letterSpacing.toFixed(4));
   };
