@@ -8,6 +8,28 @@
 
 <style>
 /* ==========================================================================
+   DESIGN TOKENS
+   Centralise repeated values so a single edit propagates everywhere.
+   ========================================================================== */
+
+:root {
+  --bg:         #0E0D0C;
+  --font-mono:  monospace;
+  --color-dim:  #555;
+  --color-text: #E8E0D4;
+
+  /* Z-index scale — explicit layers prevent accidental stacking surprises */
+  --z-grid:     1;
+  --z-scanline: 800;
+  --z-grain:    801;
+  --z-lb:       900;
+  --z-lb-close: 901;
+  --z-lb-ctrl:  902;
+  --z-welcome:  980;
+}
+
+
+/* ==========================================================================
    RESET
    ========================================================================== */
 
@@ -25,7 +47,7 @@
 html, body {
   width:  100%;
   height: 100%;
-  background: #0E0D0C;
+  background: var(--bg);
   overflow: hidden;
 }
 
@@ -34,7 +56,7 @@ html, body {
   top: 0; left: 0; right: 0;
   display: grid;
   overflow: visible;
-  background: #0E0D0C;
+  background: var(--bg);
   column-gap: 2px;
   row-gap: 0;
 }
@@ -42,26 +64,28 @@ html, body {
 .grid-fallback {
   position: fixed;
   inset: 0;
-  z-index: 0;
+  z-index: var(--z-grid);
   display: flex;
   align-items: center;
   justify-content: center;
   pointer-events: none;
-  font-family: monospace;
+  font-family: var(--font-mono);
   font-size: clamp(.7rem, 1.4vw, .95rem);
   letter-spacing: .12em;
   color: #2a2927;
   text-align: center;
   padding: 2rem;
   line-height: 2;
+  user-select: none;
 }
 
 
 /* ==========================================================================
-   CARD — layout, image
-   FIX: removed will-change from base rule (was creating 36 compositor layers
-   immediately on page load, causing excess VRAM usage on weaker devices).
-   will-change is now applied only on :hover via CSS below.
+   CARD — layout + image
+   will-change is applied only on :hover (not on the base rule) to avoid
+   creating 36 compositor layers on page load. After the physics engine snaps
+   a card to rest it clears will-change via JS, releasing the layer until the
+   next hover interaction.
    ========================================================================== */
 
 .card {
@@ -71,10 +95,7 @@ html, body {
   border-radius: 10px;
 }
 
-/* Apply GPU hint only when the card is actually being interacted with */
-.card:hover {
-  will-change: transform;
-}
+.card:hover { will-change: transform; }
 
 .card img {
   display: block;
@@ -89,8 +110,8 @@ html, body {
 
 
 /* ==========================================================================
-   CARD — shine sweep pseudo-element
-   The ::after overlay sits off-screen left by default.
+   CARD — shine sweep
+   ::after sits off-screen left by default.
    Adding .shine triggers the keyframe that sweeps the highlight across.
    ========================================================================== */
 
@@ -116,37 +137,23 @@ html, body {
   animation: shineSweep .9s cubic-bezier(.4, 0, .2, 1) forwards;
 }
 
-@keyframes shineSweep {
-  0%   { transform: translateX(-130%); opacity: 1; }
-  60%  { opacity: 1; }
-  100% { transform: translateX(130%);  opacity: 0; }
-}
-
 
 /* ==========================================================================
-   CARD — staggered entry animation
-   ========================================================================== */
-
-@keyframes cardIn {
-  from { opacity: 0; transform: var(--init-rot) scale(.94) translateY(6px); }
-  to   { opacity: 1; transform: var(--init-rot) scale(1)   translateY(0);   }
-}
-
-
-/* ==========================================================================
-   SCREEN OVERLAYS — CRT scanlines + grain noise
+   SCREEN OVERLAYS — CRT scanlines + film grain
    ========================================================================== */
 
 body::before {
   content: '';
   position: fixed;
   inset: 0;
-  z-index: 800;
+  z-index: var(--z-scanline);
   pointer-events: none;
   background: repeating-linear-gradient(
     0deg,
-    transparent,         transparent         2px,
-    rgba(0, 0, 0, .18)  2px,                rgba(0, 0, 0, .18) 4px
+    transparent        0px,
+    transparent        2px,
+    rgba(0,0,0, .18)   2px,
+    rgba(0,0,0, .18)   4px
   );
 }
 
@@ -154,33 +161,27 @@ body::after {
   content: '';
   position: fixed;
   inset: 0;
-  z-index: 801;
+  z-index: var(--z-grain);
   pointer-events: none;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='.07'/%3E%3C/svg%3E");
   animation: grainShift 0.08s steps(1) infinite;
   opacity: .7;
 }
 
-@keyframes grainShift {
-  0%   { transform: translate(   0,    0); }
-  25%  { transform: translate(-2px,  1px); }
-  50%  { transform: translate( 1px, -1px); }
-  75%  { transform: translate(-1px,  2px); }
-}
-
 
 /* ==========================================================================
-   LIGHTBOX — overlay, frame, image
+   LIGHTBOX — overlay + frame
    ========================================================================== */
 
 .lb {
   display: none;
   position: fixed;
   inset: 0;
-  z-index: 900;
+  z-index: var(--z-lb);
   background: rgba(14, 13, 12, .96);
   overflow: hidden;
 
+  /* Safe-area insets for notched devices */
   padding-top:    max(3.2rem, env(safe-area-inset-top,    0px));
   padding-bottom: max(2.4rem, env(safe-area-inset-bottom, 0px));
   padding-left:   max(3.2rem, env(safe-area-inset-left,   0px));
@@ -216,14 +217,6 @@ body::after {
   border-radius: 14px;
 }
 
-@keyframes lbOpen   { from { opacity: 0; transform: scale(.96) skewX(-1deg); } to { opacity: 1; transform: scale(1) skewX(0); } }
-@keyframes lbSlideL { from { opacity: 0; transform: translateX( 28px) scale(.97); } to { opacity: 1; transform: none; } }
-@keyframes lbSlideR { from { opacity: 0; transform: translateX(-28px) scale(.97); } to { opacity: 1; transform: none; } }
-
-.lb-frame.anim-open { animation: lbOpen   .28s cubic-bezier(.22, 1, .36, 1) both; }
-.lb-frame.anim-l    { animation: lbSlideL .24s cubic-bezier(.22, 1, .36, 1) both; }
-.lb-frame.anim-r    { animation: lbSlideR .24s cubic-bezier(.22, 1, .36, 1) both; }
-
 
 /* ==========================================================================
    LIGHTBOX — controls
@@ -232,15 +225,15 @@ body::after {
 .lb-close {
   position: fixed;
   top: 1.4rem; right: 1.6rem;
-  font-family: monospace;
+  font-family: var(--font-mono);
   font-size: .75rem;
   letter-spacing: .12em;
   text-transform: uppercase;
-  color: #555;
+  color: var(--color-dim);
   cursor: pointer;
   border: none; background: none;
   transition: color .18s;
-  z-index: 901;
+  z-index: var(--z-lb-close);
 }
 .lb-close:hover { color: #ff3c00; }
 
@@ -248,7 +241,7 @@ body::after {
   position: fixed;
   top: 50%;
   transform: translateY(-50%);
-  font-family: monospace;
+  font-family: var(--font-mono);
   font-size: 2.6rem;
   line-height: 1;
   color: rgba(232, 224, 212, .2);
@@ -256,23 +249,23 @@ body::after {
   cursor: pointer;
   padding: 1.2rem 1.4rem;
   transition: color .18s;
-  z-index: 902;
+  z-index: var(--z-lb-ctrl);
   user-select: none;
 }
-.lb-arrow:hover { color: rgba(232, 224, 212, .8); }
-.lb-arrow-l { left:  .5rem; }
-.lb-arrow-r { right: .5rem; }
+.lb-arrow:hover   { color: rgba(232, 224, 212, .8); }
+.lb-arrow-l       { left:  .5rem; }
+.lb-arrow-r       { right: .5rem; }
 
 .lb-counter {
   position: fixed;
   bottom: 1.4rem;
   left: 50%;
   transform: translateX(-50%);
-  font-family: monospace;
+  font-family: var(--font-mono);
   font-size: .68rem;
   letter-spacing: .14em;
   color: #3a3a3a;
-  z-index: 902;
+  z-index: var(--z-lb-ctrl);
   pointer-events: none;
 }
 
@@ -284,7 +277,7 @@ body::after {
 .welcome {
   position: fixed;
   inset: 0;
-  z-index: 980;
+  z-index: var(--z-welcome);
   background: rgba(14, 13, 12, .92);
   display: flex;
   align-items:     center;
@@ -299,10 +292,10 @@ body::after {
 }
 
 .welcome-text {
-  font-family: monospace;
+  font-family: var(--font-mono);
   font-size: clamp(.9rem, 1.8vw, 1.2rem);
   line-height: 1.9;
-  color: #E8E0D4;
+  color: var(--color-text);
   letter-spacing: .04em;
   text-align: center;
   max-width: 520px;
@@ -314,13 +307,9 @@ body::after {
   margin-top: 2rem;
   font-size: .72rem;
   letter-spacing: .14em;
-  color: #555;
+  color: var(--color-dim);
   animation: hint 3.2s ease-in-out infinite;
 }
-
-@keyframes hint    { 0%, 100% { opacity: 0; } 30%, 70% { opacity: 1; } }
-@keyframes wFadeIn  { from { opacity: 0; } to { opacity: 1; } }
-@keyframes wFadeOut { from { opacity: 1; } to { opacity: 0; } }
 
 
 /* ==========================================================================
@@ -345,30 +334,6 @@ body::after {
   opacity: .55;
 }
 
-@keyframes spinOrbit { to { transform: rotate(360deg); } }
-
-
-/* ==========================================================================
-   FALLBACK HINT
-   ========================================================================== */
-
-.fallback-hint {
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  font-family: monospace;
-  font-size: clamp(.7rem, 1.4vw, 1rem);
-  line-height: 2;
-  letter-spacing: .12em;
-  color: #2a2927;
-  pointer-events: none;
-  user-select: none;
-}
-
 
 /* ==========================================================================
    RESPONSIVE OVERRIDES
@@ -386,20 +351,67 @@ body::after {
 
 /* ==========================================================================
    REDUCED MOTION
-   FIX: Disable all decorative animations for users who have requested it
-   in their OS/browser accessibility settings. This also prevents the
-   animationend event path from being the only way to mark a card ready.
+   Disable all decorative animations for users who have requested it.
+   Cards are marked ready immediately so physics still works without motion.
    ========================================================================== */
 
 @media (prefers-reduced-motion: reduce) {
-  .card        { animation: none !important; }
-  .card::after { animation: none !important; }
-  body::after  { animation: none !important; }
-  .orbit-svg   { animation: none !important; }
-  .welcome, .welcome.hidden { animation: none !important; }
-  /* Disable will-change entirely — compositor hints are pointless without motion */
-  .card:hover  { will-change: auto; }
+  .card,
+  .card::after,
+  body::after,
+  .orbit-svg,
+  .welcome,
+  .welcome.hidden { animation: none !important; }
+
+  /* Compositor hints are pointless without motion */
+  .card:hover { will-change: auto; }
 }
+
+
+/* ==========================================================================
+   KEYFRAMES — gathered in one place for easy maintenance
+   ========================================================================== */
+
+@keyframes cardIn {
+  from { opacity: 0; transform: var(--init-rot) scale(.94) translateY(6px); }
+  to   { opacity: 1; transform: var(--init-rot) scale(1)   translateY(0);   }
+}
+
+@keyframes shineSweep {
+  0%   { transform: translateX(-130%); opacity: 1; }
+  60%  { opacity: 1; }
+  100% { transform: translateX(130%);  opacity: 0; }
+}
+
+@keyframes grainShift {
+  0%   { transform: translate(   0,    0); }
+  25%  { transform: translate(-2px,  1px); }
+  50%  { transform: translate( 1px, -1px); }
+  75%  { transform: translate(-1px,  2px); }
+}
+
+@keyframes lbOpen {
+  from { opacity: 0; transform: scale(.96) skewX(-1deg); }
+  to   { opacity: 1; transform: scale(1)   skewX(0);     }
+}
+@keyframes lbSlideL {
+  from { opacity: 0; transform: translateX( 28px) scale(.97); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes lbSlideR {
+  from { opacity: 0; transform: translateX(-28px) scale(.97); }
+  to   { opacity: 1; transform: none; }
+}
+
+@keyframes spinOrbit { to { transform: rotate(360deg); } }
+@keyframes hint      { 0%, 100% { opacity: 0; } 30%, 70% { opacity: 1; } }
+@keyframes wFadeIn   { from { opacity: 0; } to { opacity: 1; } }
+@keyframes wFadeOut  { from { opacity: 1; } to { opacity: 0; } }
+
+/* Lightbox frame animation classes */
+.lb-frame.anim-open { animation: lbOpen   .28s cubic-bezier(.22, 1, .36, 1) both; }
+.lb-frame.anim-l    { animation: lbSlideL .24s cubic-bezier(.22, 1, .36, 1) both; }
+.lb-frame.anim-r    { animation: lbSlideR .24s cubic-bezier(.22, 1, .36, 1) both; }
 </style>
 </head>
 <body>
@@ -433,14 +445,6 @@ body::after {
 
 
 <!-- =========================================================================
-     FALLBACK HINT
-     ========================================================================= -->
-<div class="fallback-hint">
-  if nothing is here —<br>try refreshing the page
-</div>
-
-
-<!-- =========================================================================
      MOODBOARD GRID
      ========================================================================= -->
 <div class="grid-fallback">if nothing is here —<br>try refreshing the page</div>
@@ -451,7 +455,7 @@ body::after {
      LIGHTBOX
      ========================================================================= -->
 <div class="lb" id="lb">
-  <button class="lb-close"           id="lb-close">[ close ]</button>
+  <button class="lb-close"            id="lb-close">[ close ]</button>
   <button class="lb-arrow lb-arrow-l" id="lb-prev">&#8249;</button>
   <button class="lb-arrow lb-arrow-r" id="lb-next">&#8250;</button>
   <div class="lb-frame anim-open" id="lb-frame">
@@ -461,8 +465,7 @@ body::after {
 </div>
 
 
-<script>
-"use strict";
+<script type="module">
 
 /* ==========================================================================
    IMAGE CATALOGUE
@@ -492,40 +495,45 @@ const IMAGE_CATALOGUE = [
 
 
 /* ==========================================================================
-   LAYOUT CONSTANTS
+   CARD CONSTANTS
    ========================================================================== */
 
 const CARD_ROTATIONS = [-8, -6, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6, 8];
 
-const CARD_ENTRY_DURATION = 0.20;
-const CARD_ENTRY_COL_STEP = 0.026;
-const CARD_ENTRY_ROW_STEP =
+const CARD_ENTRY_DURATION = 0.20;   // s — animation duration per card
+const CARD_ENTRY_COL_STEP = 0.026;  // s — added delay per column
+// Row step: ensures all cards in row N finish before row N+1 starts.
+// The col multiplier (3/5/6) is intentionally one step larger than the
+// max column index for the 3- and 5-column layouts, giving a small extra
+// visual pause between rows on smaller viewports.
+const CARD_ENTRY_ROW_STEP = (
   (window.innerWidth < 700 ? 3 : window.innerWidth < 1100 ? 5 : 6)
-  * CARD_ENTRY_COL_STEP + CARD_ENTRY_DURATION + 0.055;
+  * CARD_ENTRY_COL_STEP + CARD_ENTRY_DURATION + 0.055
+);
 
 
 /* ==========================================================================
    PHYSICS CONSTANTS
    ========================================================================== */
 
-const SPRING_STIFFNESS         = 0.22;
-const SPRING_DAMPING_HOVER     = 0.62;
-const SPRING_DAMPING_RETURN    = 0.72;
-const PUSH_FORCE               = 28;
-const SLEEP_VELOCITY_THRESHOLD = 0.008;
-const SLEEP_POSITION_THRESHOLD = 0.04;
-
-// Read the OS/browser reduced-motion preference once at startup.
-// Used in CardFactory to bypass the animation path entirely.
-const REDUCED_MOTION = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const SPRING_STIFFNESS          = 0.22;
+const SPRING_DAMPING_HOVER      = 0.62;
+const SPRING_DAMPING_RETURN     = 0.72;
+const PUSH_FORCE                = 28;
+const SLEEP_VELOCITY_THRESHOLD  = 0.008;
+const SLEEP_POSITION_THRESHOLD  = 0.04;
+const HOVER_DELAY_MS            = 55;    // ms before hover physics activates
+const SHINE_DURATION_MS         = 950;   // matches CSS .9s keyframe
+const ROTATION_LERP             = 0.12;  // fraction per frame for rotation snap
 
 
 /* ==========================================================================
-   UTILITY — Fisher-Yates shuffle
+   UTILITIES
    ========================================================================== */
 
-const shuffleArray = arr => {
-  const result = arr.slice();
+/** Fisher-Yates shuffle — returns a new array, never mutates the original. */
+const shuffleArray = (arr) => {
+  const result = [...arr];
   for (let i = result.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [result[i], result[j]] = [result[j], result[i]];
@@ -533,53 +541,92 @@ const shuffleArray = arr => {
   return result;
 };
 
+/**
+ * Single Euler spring integration step — pure function, no side effects.
+ * @returns {{ pos: number, vel: number }}
+ */
+const springStep = (pos, vel, target, stiffness, damping) => {
+  const newVel = vel * damping + (target - pos) * stiffness;
+  return { pos: pos + newVel, vel: newVel };
+};
+
+/**
+ * Resolve the column count for the given viewport width.
+ * Single source of truth — used by GridSystem and CARD_ENTRY_ROW_STEP.
+ */
+const getColumnCount = (width = window.innerWidth) =>
+  width < 700 ? 3 : width < 1100 ? 5 : 7;
+
+/**
+ * Safe localStorage wrapper.
+ * Direct calls throw a SecurityError in: Safari private mode, sandboxed
+ * iframes, and Firefox with strict tracking protection.
+ */
+const storage = {
+  get: (key)      => { try { return localStorage.getItem(key);       } catch { return null; } },
+  set: (key, val) => { try {        localStorage.setItem(key, val);  } catch { /* unavailable */ } },
+};
+
+/**
+ * Reactive reduced-motion preference.
+ * Subscribes to OS/browser changes so the physics engine can respond
+ * dynamically — without requiring a page reload.
+ */
+const ReducedMotion = (() => {
+  const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+  let _reduced = mq.matches;
+
+  mq.addEventListener('change', ({ matches }) => {
+    _reduced = matches;
+    if (matches) PhysicsEngine.snapAllToRest();
+  });
+
+  return { isReduced: () => _reduced };
+})();
+
 
 /* ==========================================================================
    DOM CACHE
+   Gather all element references in one object so we avoid repeated
+   getElementById calls throughout the modules.
    ========================================================================== */
 
-const gridEl      = document.getElementById('grid');
-const lightboxEl  = document.getElementById('lb');
-const lbFrameEl   = document.getElementById('lb-frame');
-const lbImgEl     = document.getElementById('lb-img');
-const lbCounterEl = document.getElementById('lb-counter');
-const welcomeEl   = document.getElementById('welcome');
+const DOM = {
+  grid:      document.getElementById('grid'),
+  lightbox:  document.getElementById('lb'),
+  lbFrame:   document.getElementById('lb-frame'),
+  lbImg:     document.getElementById('lb-img'),
+  lbCounter: document.getElementById('lb-counter'),
+  welcome:   document.getElementById('welcome'),
+};
 
 
 /* ==========================================================================
    GRID SYSTEM
-
-   FIX 1 — stale exported values:
-     Previously, rowHeight and cardHeight were exported as snapshot primitives.
-     Any code reading GridSystem.rowHeight after a resize would see the initial
-     value. They are now exposed through getter functions.
-
-   FIX 2 — layout thrashing in onResize:
-     The old resize handler wrote to DOM (style.height) then immediately read
-     from DOM (getBoundingClientRect) inside the same loop, forcing a forced
-     reflow on every iteration. The new handler batches all writes first,
-     then delegates center recalculation to a callback that uses pure geometry
-     (computeNaturalCenter) — no DOM reads needed.
    ========================================================================== */
 
 const GridSystem = (() => {
 
-  const columnCount = window.innerWidth < 700 ? 3
-                    : window.innerWidth < 1100 ? 5
-                    : 7;
+  const COLUMN_GAP  = 2;                                  // px — matches CSS column-gap
+  const SOURCE_COUNT = 36;                                // desired grid slots
 
-  const rowCount  = Math.ceil(36 / columnCount);
-  const cardCount = columnCount * rowCount;
+  const columnCount = getColumnCount();
+  const rowCount    = Math.ceil(SOURCE_COUNT / columnCount);
+  const cardCount   = columnCount * rowCount;
 
   let viewportHeight = window.innerHeight;
   let rowHeight      = viewportHeight / (rowCount + 2);
   let cardHeight     = rowHeight * 3;
 
   const applyGridStyle = () => {
-    gridEl.style.gridTemplateColumns = `repeat(${columnCount}, 1fr)`;
-    gridEl.style.gridTemplateRows    = `repeat(${rowCount}, ${rowHeight.toFixed(2)}px)`;
+    DOM.grid.style.gridTemplateColumns = `repeat(${columnCount}, 1fr)`;
+    DOM.grid.style.gridTemplateRows    = `repeat(${rowCount}, ${rowHeight.toFixed(2)}px)`;
   };
 
+  /**
+   * Build a shuffled pool of filenames of exactly cardCount entries.
+   * Tiles the catalogue if cardCount > catalogue length.
+   */
   const buildPool = () => {
     let pool = [];
     while (pool.length < cardCount) pool = pool.concat(shuffleArray(IMAGE_CATALOGUE));
@@ -587,71 +634,65 @@ const GridSystem = (() => {
   };
 
   /**
-   * Computes the natural (un-transformed) center of a card from grid geometry.
+   * Compute the untransformed (natural) centre of a card from grid geometry.
    *
-   * This avoids getBoundingClientRect entirely, which would return a rect that
-   * already includes any ongoing physics translation — causing restCenterX/Y to
-   * drift and creating a feedback loop where cards never settle correctly.
+   * Avoids getBoundingClientRect — that rect includes the current CSS transform,
+   * so any active physics translation would corrupt the rest position and create
+   * a feedback loop where cards never settle.
    *
-   * column-gap is 2px (see CSS). Card width = (viewport - total gaps) / columns.
-   * center X = col * (cardWidth + gap) + cardWidth / 2
-   * center Y = row * rowHeight + cardHeight / 2
+   *   centre X = col × (cardWidth + gap) + cardWidth / 2
+   *   centre Y = row × rowHeight + cardHeight / 2
    */
   const computeNaturalCenter = (col, row) => {
-    const totalGap  = (columnCount - 1) * 2;
+    const totalGap  = (columnCount - 1) * COLUMN_GAP;
     const cardWidth = (window.innerWidth - totalGap) / columnCount;
     return {
-      x: col * (cardWidth + 2) + cardWidth / 2,
+      x: col * (cardWidth + COLUMN_GAP) + cardWidth / 2,
       y: row * rowHeight + cardHeight / 2,
     };
   };
 
-  let resizeDebounceTimer = null;
-
   /**
-   * Resize handler.
-   * Batches all DOM writes, then calls onCenterUpdate for each ready card
-   * with a geometrically computed center (no DOM reads in the loop).
+   * Observe viewport-size changes with ResizeObserver.
+   * Unlike window 'resize', ResizeObserver does not fire when the on-screen
+   * keyboard appears on mobile (which only changes the visual viewport, not
+   * the layout viewport that the grid is anchored to).
    *
-   * @param {Array}    cards          - array of cardState objects
-   * @param {Function} onCenterUpdate - callback(cardState, x, y)
+   * Batch-writes all DOM changes, then recomputes physics rest centres via
+   * pure geometry — no DOM reads inside the card loop.
+   *
+   * @param {object[]} cards
+   * @param {(state: object, x: number, y: number) => void} onCenterUpdate
    */
-  const onResize = (cards, onCenterUpdate) => {
-    clearTimeout(resizeDebounceTimer);
-    resizeDebounceTimer = setTimeout(() => {
-      const newViewportHeight = window.innerHeight;
-      if (Math.abs(newViewportHeight - viewportHeight) < 2) return;
+  const observeResize = (cards, onCenterUpdate) => {
+    const ro = new ResizeObserver((entries) => {
+      const newHeight = entries[0].contentRect.height;
+      if (Math.abs(newHeight - viewportHeight) < 2) return;
 
-      viewportHeight = newViewportHeight;
+      viewportHeight = newHeight;
       rowHeight      = viewportHeight / (rowCount + 2);
       cardHeight     = rowHeight * 3;
 
-      // --- Batch all DOM writes first ---
-      gridEl.style.gridTemplateRows = `repeat(${rowCount}, ${rowHeight.toFixed(2)}px)`;
-      for (const cardState of cards) {
-        cardState.el.style.height = cardHeight.toFixed(2) + 'px';
+      // 1. Batch all DOM writes
+      DOM.grid.style.gridTemplateRows = `repeat(${rowCount}, ${rowHeight.toFixed(2)}px)`;
+      for (const state of cards) {
+        state.el.style.height = cardHeight.toFixed(2) + 'px';
       }
 
-      // --- Then update physics rest positions via pure geometry (no reflow) ---
-      if (onCenterUpdate) {
-        for (const cardState of cards) {
-          if (!cardState.ready) continue;
-          const { x, y } = computeNaturalCenter(cardState.col, cardState.row);
-          onCenterUpdate(cardState, x, y);
-        }
+      // 2. Update physics rest centres — pure geometry, no reflow
+      for (const state of cards) {
+        if (!state.ready) continue;
+        const { x, y } = computeNaturalCenter(state.col, state.row);
+        onCenterUpdate(state, x, y);
       }
-    }, 80);
+    });
+
+    ro.observe(document.documentElement);
   };
 
   return {
-    columnCount,
-    rowCount,
-    cardCount,
-    buildPool,
-    applyGridStyle,
-    onResize,
-    computeNaturalCenter,
-    // Getters so callers always see the current value, not a startup snapshot
+    columnCount, rowCount, cardCount,
+    buildPool, applyGridStyle, observeResize, computeNaturalCenter,
     getRowHeight:  () => rowHeight,
     getCardHeight: () => cardHeight,
   };
@@ -659,109 +700,123 @@ const GridSystem = (() => {
 
 
 /* ==========================================================================
+   LAZY IMAGE LOADER
+   Uses IntersectionObserver to defer src assignment until the card element
+   is about to enter the viewport. For a fixed full-screen grid all cards
+   are in view immediately, but the async callback lets the browser schedule
+   and prioritise network requests rather than firing all 36 in one tick.
+   ========================================================================== */
+
+const LazyImageLoader = (() => {
+
+  const observer = new IntersectionObserver((entries, obs) => {
+    for (const entry of entries) {
+      if (!entry.isIntersecting) continue;
+      const img = entry.target;
+      img.src = img.dataset.src;
+      obs.unobserve(img);
+    }
+  }, {
+    rootMargin: '100px',  // start loading slightly before the card is visible
+  });
+
+  /** Queue an <img> element for lazy loading via its data-src attribute. */
+  const observe = (img) => observer.observe(img);
+
+  return { observe };
+})();
+
+
+
+
+/* ==========================================================================
    CARD FACTORY
-
-   FIX 1 — col/row stored in cardState:
-     The resize handler needs col and row to recompute natural centers without
-     touching the DOM. They are now part of the state object.
-
-   FIX 2 — animationend may never fire:
-     If the page is backgrounded during startup, the browser can throttle or
-     skip CSS animations, meaning animationend never arrives and the card stays
-     ready=false forever — physics is permanently disabled for it. A fallback
-     setTimeout is installed to guarantee markReady() is called regardless.
-
-   FIX 3 — reduced-motion path:
-     When the user prefers reduced motion, CSS suppresses cardIn via
-     `animation: none !important`. No animationend will fire. We set the card
-     ready immediately and apply the base rotation via inline style.
-
-   FIX 4 — restCenter uses geometry, not getBoundingClientRect:
-     Previously restCenter was read from getBoundingClientRect inside
-     animationend. That rect includes the current CSS transform, so if any
-     physics translation was active at the moment of reading, the rest
-     position would be wrong. computeNaturalCenter() is purely mathematical.
    ========================================================================== */
 
 const CardFactory = (() => {
 
+  const pickRotation = () =>
+    CARD_ROTATIONS[Math.floor(Math.random() * CARD_ROTATIONS.length)];
+
+  /**
+   * Build a card element and its physics state object.
+   *
+   * @param {string} imagePath
+   * @param {number} poolIndex  - position in the shuffled pool; used as lightbox key
+   * @param {number} row
+   * @param {number} col
+   * @returns {{ el: HTMLElement, state: object }}
+   */
   const create = (imagePath, poolIndex, row, col) => {
-    const baseRotation = CARD_ROTATIONS[
-      Math.floor(Math.random() * CARD_ROTATIONS.length)
-    ];
+    const baseRotation = pickRotation();
 
-    const cardEl = document.createElement('div');
-    cardEl.className = 'card';
+    // --- Element ---
+    const el = document.createElement('div');
+    el.className = 'card';
+    el.dataset.poolIdx = poolIndex;
+    el.style.setProperty('--init-rot', `rotate(${baseRotation}deg)`);
+    el.style.height = GridSystem.getCardHeight().toFixed(2) + 'px';
+    el.style.zIndex = (row + 1) * 2;
 
-    cardEl.style.setProperty('--init-rot', `rotate(${baseRotation}deg)`);
-    cardEl.style.height = GridSystem.getCardHeight().toFixed(2) + 'px';
-    cardEl.style.zIndex = (row + 1) * 2;
+    // Store src in data-src; LazyImageLoader will assign it to src
+    // once the element intersects the viewport.
+    const img = document.createElement('img');
+    img.decoding    = 'async';
+    img.dataset.src = imagePath;
+    img.onerror     = () => { el.style.background = '#1a1815'; };
+    el.appendChild(img);
+    LazyImageLoader.observe(img);
 
+    // --- Staggered entry animation ---
     const entryDelay = (row * CARD_ENTRY_ROW_STEP + col * CARD_ENTRY_COL_STEP).toFixed(3);
-    cardEl.style.animation =
+    el.style.animation =
       `cardIn ${CARD_ENTRY_DURATION}s ${entryDelay}s cubic-bezier(.22,1,.36,1) both`;
 
-    const img = document.createElement('img');
-    img.decoding = 'async';
-    img.loading  = 'eager';
-    img.onerror  = () => { cardEl.style.background = '#1a1815'; };
-    img.src      = imagePath;
-    cardEl.appendChild(img);
-
-    cardEl._poolIdx = poolIndex;
-
-    const cardState = {
-      el:  cardEl,
-      row,
-      col,           // stored so onResize can call computeNaturalCenter(col, row)
+    // --- Physics state ---
+    const state = {
+      el,
+      row, col,
       baseRotation,
 
-      translateX:  0, translateY:  0,
-      rotationZ:   baseRotation,
-      scale:       1,
+      translateX: 0,  translateY: 0,
+      rotationZ:  baseRotation,
+      scale:      1,
 
-      velocityX:     0, velocityY:     0,
-      velocityScale: 0,
+      velocityX: 0, velocityY: 0, velocityScale: 0,
 
       targetTranslateX: 0, targetTranslateY: 0,
       targetScale:      1,
 
       restCenterX: 0, restCenterY: 0,
-
       ready:    false,
       sleeping: false,
     };
 
     /**
-     * Marks the card as ready for physics simulation.
+     * Marks the card ready for physics simulation.
      * Idempotent — safe to call from both animationend and the fallback timer.
-     * Wakes the RAF loop so the newly ready card is picked up on the next tick.
      */
     const markReady = () => {
-      if (cardState.ready) return; // guard against double-call
-      const { x, y } = GridSystem.computeNaturalCenter(col, row);
-      cardState.restCenterX = x;
-      cardState.restCenterY = y;
-      cardState.ready       = true;
+      if (state.ready) return;
+      const { x, y }    = GridSystem.computeNaturalCenter(col, row);
+      state.restCenterX = x;
+      state.restCenterY = y;
+      state.ready       = true;
       PhysicsEngine.wake();
     };
 
-    if (REDUCED_MOTION) {
-      // CSS has disabled cardIn via `animation: none !important`.
-      // No animationend will fire, so mark the card ready after DOM insertion.
-      cardEl.style.animation = 'none';
-      cardEl.style.transform = `rotate(${baseRotation}deg)`;
+    if (ReducedMotion.isReduced()) {
+      el.style.animation = 'none';
+      el.style.transform = `rotate(${baseRotation}deg)`;
       setTimeout(markReady, 0);
     } else {
-      cardEl.addEventListener('animationend', markReady);
-
-      // Fallback: if animationend is lost (backgrounded tab, browser quirk,
-      // or iframe constraints), this timer guarantees markReady() is invoked.
+      el.addEventListener('animationend', markReady);
+      // Fallback: browser may throttle animations in backgrounded tabs
       const fallbackMs = (parseFloat(entryDelay) + CARD_ENTRY_DURATION + 0.15) * 1000;
       setTimeout(markReady, fallbackMs);
     }
 
-    return { el: cardEl, state: cardState };
+    return { el, state };
   };
 
   return { create };
@@ -770,169 +825,145 @@ const CardFactory = (() => {
 
 /* ==========================================================================
    PHYSICS ENGINE
-
-   FIX 1 — RAF ran for ~4 seconds doing nothing:
-     The original tick() set allSleeping = false for any card that wasn't
-     ready yet. During startup all 36 cards fire staggered animations over
-     ~3–4 seconds. Every RAF frame would find at least one not-ready card,
-     keep allSleeping false, and reschedule itself — burning CPU for no
-     visual benefit. Not-ready cards are now simply skipped and do NOT
-     influence the sleep decision.
-
-   FIX 2 — RAF no longer wakes on init():
-     The old code called wake() at the end of init(). Since no card is ready
-     yet, this started the loop prematurely (see FIX 1). wake() is now called
-     from markReady() inside CardFactory — i.e., only when there is actually
-     something to simulate.
-
-   FIX 3 — hoverTimer left as a stale ID:
-     clearTimeout() was called but hoverTimer was never reset to null.
-     Subsequent clearTimeout(staleId) is harmless but misleading and makes
-     the "is a timer pending?" check unreliable. All branches now null it out.
-
-   FIX 4 — sleep condition rewritten for clarity:
-     Replaced six separate range checks with Math.abs() calls. Equivalent
-     logic, easier to read and audit.
    ========================================================================== */
 
 const PhysicsEngine = (() => {
 
+  // Cursor position; set far off-screen when not hovering
   let mouseX = -9999;
   let mouseY = -9999;
 
   let hoveredCard = null;
   let hoverTimer  = null;
+  let rafId       = null;
+  let isRunning   = false;
 
-  let rafId         = null;
-  let physicsActive = false;
+  let cardStates  = [];
 
-  let cardStates = [];
+  // --- Loop control ---
 
   const wake = () => {
-    if (physicsActive) return;
-    physicsActive = true;
+    if (isRunning) return;
+    isRunning = true;
     rafId = requestAnimationFrame(tick);
   };
 
   const pause = () => {
-    physicsActive = false;
+    isRunning = false;
     if (rafId !== null) {
       cancelAnimationFrame(rafId);
       rafId = null;
     }
   };
 
-  const attachHoverListeners = (cardState) => {
-    cardState.el.addEventListener('mouseenter', () => {
-      clearTimeout(hoverTimer);
-      hoverTimer = null;
+  // --- Per-card helpers (extracted from tick for readability) ---
 
-      hoverTimer = setTimeout(() => {
-        hoverTimer  = null;
-        hoveredCard = cardState;
-        cardState.el.style.zIndex = (cardState.row + 1) * 2 + 50;
+  /**
+   * Set hover targets: push the card away from the cursor,
+   * relative to its natural rest position.
+   */
+  const applyHoverTargets = (state) => {
+    const dx   = (state.restCenterX + state.translateX) - mouseX;
+    const dy   = (state.restCenterY + state.translateY) - mouseY;
+    const dist = Math.hypot(dx, dy);
 
-        if (!cardState.el.classList.contains('shine')) {
-          cardState.el.classList.add('shine');
-          setTimeout(() => cardState.el.classList.remove('shine'), 950);
-        }
-        wake();
-      }, 55);
-    });
-
-    cardState.el.addEventListener('mouseleave', () => {
-      clearTimeout(hoverTimer);
-      hoverTimer = null;
-
-      if (hoveredCard === cardState) {
-        hoveredCard = null;
-        cardState.el.style.zIndex = (cardState.row + 1) * 2;
-      }
-    });
+    if (dist > 0) {
+      state.targetTranslateX = (dx / dist) * PUSH_FORCE;
+      state.targetTranslateY = (dy / dist) * PUSH_FORCE;
+    }
+    state.targetScale = 1.10;
   };
 
+  /** Reset targets to resting position when card is not hovered. */
+  const clearTargets = (state) => {
+    state.targetTranslateX = 0;
+    state.targetTranslateY = 0;
+    state.targetScale      = 1;
+  };
+
+  /** Returns true when all velocities and displacements are negligible. */
+  const isSleepReady = (state) =>
+    Math.abs(state.velocityX)     < SLEEP_VELOCITY_THRESHOLD &&
+    Math.abs(state.velocityY)     < SLEEP_VELOCITY_THRESHOLD &&
+    Math.abs(state.velocityScale) < SLEEP_VELOCITY_THRESHOLD &&
+    Math.abs(state.translateX)    < SLEEP_POSITION_THRESHOLD &&
+    Math.abs(state.translateY)    < SLEEP_POSITION_THRESHOLD &&
+    Math.abs(state.scale - 1)     < SLEEP_POSITION_THRESHOLD;
+
+  /** Snap a card to its exact rest state and set the sleeping flag. */
+  const snapToRest = (state) => {
+    state.translateX    = 0;
+    state.translateY    = 0;
+    state.scale         = 1;
+    state.velocityX     = 0;
+    state.velocityY     = 0;
+    state.velocityScale = 0;
+    state.rotationZ     = state.baseRotation;
+
+    state.el.style.transform  = `rotate(${state.baseRotation}deg)`;
+    // Release the GPU compositor layer now that the card is at rest.
+    // CSS :hover will re-promote it if the user interacts again.
+    state.el.style.willChange = 'auto';
+    state.sleeping = true;
+  };
+
+  /** Immediately snap every ready card to rest and pause the loop.
+   *  Called by ReducedMotion when the user enables the preference mid-session. */
+  const snapAllToRest = () => {
+    for (const state of cardStates) {
+      if (state.ready && !state.sleeping) snapToRest(state);
+    }
+    pause();
+  };
+
+  // --- RAF tick ---
+
   const tick = () => {
-    const count = cardStates.length;
     let allSleeping = true;
 
-    for (let i = 0; i < count; i++) {
-      const cardState = cardStates[i];
+    for (const state of cardStates) {
+      // Skip cards still in their entry animation — they must not affect the
+      // sleep decision, or the loop would stay alive for the full entry sequence.
+      if (!state.ready) continue;
 
-      // FIX: skip non-ready cards without affecting the sleep decision.
-      // Previously `allSleeping = false` here kept the RAF loop alive for the
-      // entire staggered entry sequence (~4 s) with no physics work to do.
-      if (!cardState.ready) continue;
-
-      const isHovered = (cardState === hoveredCard);
+      const isHovered = state === hoveredCard;
       const damping   = isHovered ? SPRING_DAMPING_HOVER : SPRING_DAMPING_RETURN;
 
       if (isHovered) {
-        // Push the card away from the cursor relative to its rest position
-        const dx   = (cardState.restCenterX + cardState.translateX) - mouseX;
-        const dy   = (cardState.restCenterY + cardState.translateY) - mouseY;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-
-        if (dist > 0) {
-          cardState.targetTranslateX = (dx / dist) * PUSH_FORCE;
-          cardState.targetTranslateY = (dy / dist) * PUSH_FORCE;
-        }
-        cardState.targetScale = 1.10;
+        applyHoverTargets(state);
       } else {
-        cardState.targetTranslateX = 0;
-        cardState.targetTranslateY = 0;
-        cardState.targetScale      = 1;
+        clearTargets(state);
       }
 
-      // Sleep check — snap to rest when all velocities and offsets are negligible
-      if (
-        !isHovered &&
-        Math.abs(cardState.velocityX)     < SLEEP_VELOCITY_THRESHOLD &&
-        Math.abs(cardState.velocityY)     < SLEEP_VELOCITY_THRESHOLD &&
-        Math.abs(cardState.velocityScale) < SLEEP_VELOCITY_THRESHOLD &&
-        Math.abs(cardState.translateX)    < SLEEP_POSITION_THRESHOLD &&
-        Math.abs(cardState.translateY)    < SLEEP_POSITION_THRESHOLD &&
-        Math.abs(cardState.scale - 1)     < SLEEP_POSITION_THRESHOLD
-      ) {
-        if (!cardState.sleeping) {
-          cardState.translateX    = 0;
-          cardState.translateY    = 0;
-          cardState.scale         = 1;
-          cardState.velocityX     = 0;
-          cardState.velocityY     = 0;
-          cardState.velocityScale = 0;
-          cardState.rotationZ     = cardState.baseRotation;
-          cardState.el.style.transform = `rotate(${cardState.baseRotation}deg)`;
-          cardState.sleeping = true;
-        }
+      // Sleep check — snap to rest when motion is negligible
+      if (!isHovered && isSleepReady(state)) {
+        if (!state.sleeping) snapToRest(state);
         continue;
       }
 
-      cardState.sleeping = false;
-      allSleeping        = false;
+      state.sleeping = false;
+      allSleeping    = false;
 
-      // Simple Euler spring integration
-      let force;
+      // Spring integration — one call per axis, using the extracted pure function
+      ({ pos: state.translateX,  vel: state.velocityX     } = springStep(
+        state.translateX,  state.velocityX,     state.targetTranslateX, SPRING_STIFFNESS, damping,
+      ));
+      ({ pos: state.translateY,  vel: state.velocityY     } = springStep(
+        state.translateY,  state.velocityY,     state.targetTranslateY, SPRING_STIFFNESS, damping,
+      ));
+      ({ pos: state.scale,       vel: state.velocityScale } = springStep(
+        state.scale,       state.velocityScale, state.targetScale,      SPRING_STIFFNESS, damping,
+      ));
 
-      force = (cardState.targetTranslateX - cardState.translateX) * SPRING_STIFFNESS;
-      cardState.velocityX   = cardState.velocityX   * damping + force;
-      cardState.translateX += cardState.velocityX;
+      // Gentle lerp for rotation — simpler feel than a full spring
+      state.rotationZ += (state.baseRotation - state.rotationZ) * ROTATION_LERP;
 
-      force = (cardState.targetTranslateY - cardState.translateY) * SPRING_STIFFNESS;
-      cardState.velocityY   = cardState.velocityY   * damping + force;
-      cardState.translateY += cardState.velocityY;
-
-      force = (cardState.targetScale - cardState.scale) * SPRING_STIFFNESS;
-      cardState.velocityScale = cardState.velocityScale * damping + force;
-      cardState.scale        += cardState.velocityScale;
-
-      cardState.rotationZ += (cardState.baseRotation - cardState.rotationZ) * 0.12;
-
-      // Single composited transform — translate + rotate + scale on one line
-      // keeps the element on the GPU layer and avoids triggering layout
-      cardState.el.style.transform =
-        `translate(${cardState.translateX.toFixed(1)}px,${cardState.translateY.toFixed(1)}px)` +
-        ` rotate(${cardState.rotationZ.toFixed(2)}deg)` +
-        ` scale(${cardState.scale.toFixed(3)})`;
+      // Single composited transform — keeps the element on the GPU layer,
+      // avoids triggering layout, and batches translate + rotate + scale.
+      state.el.style.transform =
+        `translate(${state.translateX.toFixed(1)}px,${state.translateY.toFixed(1)}px)` +
+        ` rotate(${state.rotationZ.toFixed(2)}deg)` +
+        ` scale(${state.scale.toFixed(3)})`;
     }
 
     if (allSleeping) {
@@ -941,6 +972,38 @@ const PhysicsEngine = (() => {
       rafId = requestAnimationFrame(tick);
     }
   };
+
+  // --- Hover listeners ---
+
+  const attachHoverListeners = (state) => {
+    state.el.addEventListener('mouseenter', () => {
+      clearTimeout(hoverTimer);
+      // Short delay prevents accidental activations during fast cursor sweeps
+      hoverTimer = setTimeout(() => {
+        hoverTimer  = null;
+        hoveredCard = state;
+        state.el.style.zIndex = (state.row + 1) * 2 + 50;
+
+        if (!state.el.classList.contains('shine')) {
+          state.el.classList.add('shine');
+          setTimeout(() => state.el.classList.remove('shine'), SHINE_DURATION_MS);
+        }
+        wake();
+      }, HOVER_DELAY_MS);
+    });
+
+    state.el.addEventListener('mouseleave', () => {
+      clearTimeout(hoverTimer);
+      hoverTimer = null;
+
+      if (hoveredCard === state) {
+        hoveredCard = null;
+        state.el.style.zIndex = (state.row + 1) * 2; // restore base z-index
+      }
+    });
+  };
+
+  // --- Init ---
 
   const init = (states) => {
     cardStates = states;
@@ -970,12 +1033,11 @@ const PhysicsEngine = (() => {
       mouseY = -9999;
     });
 
-    // FIX: do NOT call wake() here. No cards are ready yet at init time.
-    // wake() is triggered from markReady() inside CardFactory as each card's
-    // entry animation completes (or the fallback timer fires).
+    // wake() is called from markReady() inside CardFactory as each card
+    // completes its entry animation (or the fallback timer fires).
   };
 
-  return { init, attachHoverListeners, wake };
+  return { init, attachHoverListeners, wake, snapAllToRest };
 })();
 
 
@@ -989,42 +1051,50 @@ const Lightbox = (() => {
   let totalCount   = 0;
   let poolPaths    = [];
 
+  const isOpen = () => DOM.lightbox.classList.contains('on');
+
   const updateCounter = () => {
-    lbCounterEl.textContent = `${currentIndex + 1} / ${totalCount}`;
+    DOM.lbCounter.textContent = `${currentIndex + 1} / ${totalCount}`;
+  };
+
+  /**
+   * Restart the frame's CSS animation by forcing a reflow.
+   * Required when navigating — the browser won't re-run an animation
+   * that is already applied on the same element.
+   */
+  const playFrameAnimation = (animClass) => {
+    DOM.lbFrame.className = 'lb-frame';
+    void DOM.lbFrame.offsetWidth;          // intentional forced reflow
+    DOM.lbFrame.className = `lb-frame ${animClass}`;
   };
 
   const open = (poolIndex) => {
-    if (lightboxEl.classList.contains('on')) return;
-    currentIndex        = poolIndex;
-    lbImgEl.src         = poolPaths[poolIndex];
-    lbFrameEl.className = 'lb-frame anim-open';
-    lightboxEl.classList.add('on');
+    if (isOpen()) return;
+    currentIndex           = poolIndex;
+    DOM.lbImg.src          = poolPaths[poolIndex];
+    DOM.lbFrame.className  = 'lb-frame anim-open';
+    DOM.lightbox.classList.add('on');
     updateCounter();
   };
 
   const navigate = (direction) => {
     currentIndex = (currentIndex + direction + totalCount) % totalCount;
-
-    // Force reflow to restart the CSS animation when navigating
-    lbFrameEl.className = 'lb-frame';
-    void lbFrameEl.offsetWidth;
-    lbFrameEl.className = `lb-frame ${direction > 0 ? 'anim-l' : 'anim-r'}`;
-
-    lbImgEl.src = poolPaths[currentIndex];
+    playFrameAnimation(direction > 0 ? 'anim-l' : 'anim-r');
+    DOM.lbImg.src = poolPaths[currentIndex];
     updateCounter();
   };
 
   const close = () => {
-    lightboxEl.classList.remove('on');
-    setTimeout(() => { lbImgEl.src = ''; }, 300);
+    DOM.lightbox.classList.remove('on');
+    setTimeout(() => { DOM.lbImg.src = ''; }, 300);
   };
 
   const init = (paths, count) => {
     poolPaths  = paths;
     totalCount = count;
 
-    lightboxEl.addEventListener('click', (e) => {
-      if (e.target === lightboxEl) close();
+    DOM.lightbox.addEventListener('click', (e) => {
+      if (e.target === DOM.lightbox) close();
     });
 
     document.getElementById('lb-close').addEventListener('click', close);
@@ -1039,19 +1109,24 @@ const Lightbox = (() => {
       navigate(1);
     });
 
+    // Keyboard navigation — map-based dispatch avoids a chain of if/else
+    const keyHandlers = {
+      ArrowLeft:  () => navigate(-1),
+      ArrowRight: () => navigate(1),
+      Escape:     close,
+    };
     document.addEventListener('keydown', (e) => {
-      if (!lightboxEl.classList.contains('on')) return;
-      if (e.key === 'ArrowLeft')  navigate(-1);
-      if (e.key === 'ArrowRight') navigate(1);
-      if (e.key === 'Escape')     close();
+      if (!isOpen()) return;
+      keyHandlers[e.key]?.();
     });
 
+    // Touch swipe — horizontal delta > 48 px triggers navigation
     let swipeStartX = 0;
-    lightboxEl.addEventListener('touchstart', (e) => {
+    DOM.lightbox.addEventListener('touchstart', (e) => {
       swipeStartX = e.touches[0].clientX;
     }, { passive: true });
 
-    lightboxEl.addEventListener('touchend', (e) => {
+    DOM.lightbox.addEventListener('touchend', (e) => {
       const deltaX = e.changedTouches[0].clientX - swipeStartX;
       if (Math.abs(deltaX) > 48) navigate(deltaX < 0 ? 1 : -1);
     });
@@ -1064,39 +1139,29 @@ const Lightbox = (() => {
 /* ==========================================================================
    WELCOME OVERLAY
 
-   FIX: localStorage access wrapped in try/catch.
-   Direct calls to getItem/setItem throw a SecurityError in:
-     - Safari private mode
-     - iframes with restrictive sandbox attributes
-     - Firefox with strict tracking protection enabled
-   The overlay still works in those environments; it just won't remember
-   that the user has dismissed it across sessions.
+   localStorage access is wrapped via the storage utility.
+   Direct calls throw a SecurityError in: Safari private mode,
+   sandboxed iframes, and Firefox with strict tracking protection.
+   The overlay still works in those environments — it just won't persist
+   the "seen" state across sessions.
    ========================================================================== */
 
 const WelcomeOverlay = (() => {
 
   const STORAGE_KEY = 'mb_seen';
 
-  const lsGet = (key) => {
-    try { return localStorage.getItem(key); } catch { return null; }
-  };
-
-  const lsSet = (key, val) => {
-    try { localStorage.setItem(key, val); } catch { /* storage unavailable — silently ignore */ }
-  };
-
   const init = () => {
-    if (!welcomeEl) return;
+    if (!DOM.welcome) return;
 
-    if (lsGet(STORAGE_KEY)) {
-      welcomeEl.style.display = 'none';
+    if (storage.get(STORAGE_KEY)) {
+      DOM.welcome.style.display = 'none';
       return;
     }
 
     const dismiss = () => {
-      lsSet(STORAGE_KEY, '1');
-      welcomeEl.classList.add('hidden');
-      setTimeout(() => { welcomeEl.style.display = 'none'; }, 520);
+      storage.set(STORAGE_KEY, '1');
+      DOM.welcome.classList.add('hidden');
+      setTimeout(() => { DOM.welcome.style.display = 'none'; }, 520);
       document.removeEventListener('click', dismiss);
     };
 
@@ -1109,24 +1174,25 @@ const WelcomeOverlay = (() => {
 
 /* ==========================================================================
    ORBIT TEXT FITTER
+   Distributes text evenly around the circular SVG path by computing the
+   letter-spacing needed to fill the full circumference.
    ========================================================================== */
 
 const OrbitTextFitter = (() => {
 
+  const ORBIT_RADIUS = 260; // must match the SVG path radius
+
   const fit = () => {
-    const textPathEl = document.getElementById('orbit-text');
-    if (!textPathEl) return;
+    const textPath = document.getElementById('orbit-text');
+    if (!textPath) return;
 
-    const naturalLength = textPathEl.getComputedTextLength();
-    // Guard: element may be hidden (mobile) so length could be 0 → skip
-    if (naturalLength === 0) return;
+    const textLength = textPath.getComputedTextLength();
+    if (textLength === 0) return;       // hidden on mobile → skip to avoid divide-by-zero
 
-    const ORBIT_RADIUS  = 260;
     const circumference = 2 * Math.PI * ORBIT_RADIUS;
-    const charCount     = textPathEl.textContent.length;
-    const letterSpacing = (circumference - naturalLength) / charCount;
+    const letterSpacing = (circumference - textLength) / textPath.textContent.length;
 
-    textPathEl.parentElement.setAttribute('letter-spacing', letterSpacing.toFixed(4));
+    textPath.parentElement.setAttribute('letter-spacing', letterSpacing.toFixed(4));
   };
 
   return { fit };
@@ -1135,52 +1201,48 @@ const OrbitTextFitter = (() => {
 
 /* ==========================================================================
    BOOTSTRAP
+   Wires all modules together and starts the application.
    ========================================================================== */
 
-(() => {
-
+const bootstrap = () => {
   GridSystem.applyGridStyle();
 
-  const pool      = GridSystem.buildPool();
-  const poolPaths = pool.map(f => `images/${encodeURIComponent(f)}`);
-
+  const pool       = GridSystem.buildPool();
+  const poolPaths  = pool.map(f => `images/${encodeURIComponent(f)}`);
   const cardStates = [];
 
-  pool.forEach((filename, poolIndex) => {
-    const row = Math.floor(poolIndex / GridSystem.columnCount);
-    const col = poolIndex % GridSystem.columnCount;
+  for (let i = 0; i < pool.length; i++) {
+    const row = Math.floor(i / GridSystem.columnCount);
+    const col = i % GridSystem.columnCount;
 
-    const { el, state } = CardFactory.create(poolPaths[poolIndex], poolIndex, row, col);
+    const { el, state } = CardFactory.create(poolPaths[i], i, row, col);
 
-    gridEl.appendChild(el);
+    DOM.grid.appendChild(el);
     cardStates.push(state);
-
     PhysicsEngine.attachHoverListeners(state);
-  });
+  }
 
-  gridEl.addEventListener('click', (e) => {
-    if (lightboxEl.classList.contains('on')) return;
+  // Delegated click — one listener on the grid rather than one per card
+  DOM.grid.addEventListener('click', (e) => {
+    if (DOM.lightbox.classList.contains('on')) return;
     const cardEl = e.target.closest('.card');
     if (!cardEl) return;
-    Lightbox.open(cardEl._poolIdx);
+    Lightbox.open(Number(cardEl.dataset.poolIdx));
   });
 
   PhysicsEngine.init(cardStates);
 
-  // FIX: pass onCenterUpdate callback so onResize can update restCenter
-  // via computeNaturalCenter() rather than getBoundingClientRect() in a loop
-  window.addEventListener('resize', () =>
-    GridSystem.onResize(cardStates, (cardState, x, y) => {
-      cardState.restCenterX = x;
-      cardState.restCenterY = y;
-    })
-  );
+  GridSystem.observeResize(cardStates, (state, x, y) => {
+    state.restCenterX = x;
+    state.restCenterY = y;
+  });
 
   Lightbox.init(poolPaths, GridSystem.cardCount);
   WelcomeOverlay.init();
   OrbitTextFitter.fit();
+};
 
-})();
+bootstrap();
 </script>
 </body>
 </html>
