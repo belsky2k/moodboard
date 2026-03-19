@@ -189,12 +189,38 @@ body::after {
   flex-shrink: 1;
   min-width: 0;
   min-height: 0;
+
+  /*
+   * SAFARI MOBILE FIX — promote the frame to its own GPU compositor layer
+   * via translateZ(0) for the entire lightbox session.
+   *
+   * will-change: transform is avoided here: it creates a new stacking
+   * context that can clip position:fixed children in some Safari versions.
+   * translateZ(0) achieves the same GPU-promotion without that side-effect.
+   *
+   * The jitter on src swap is addressed in JS: img.src is set inside
+   * requestAnimationFrame so the first composited animation frame always
+   * paints before image dimensions change. See navigate() and open().
+   */
+  transform: translateZ(0);
 }
 
 .lb-frame img {
   display: block;
-  width:  auto;
-  height: auto;
+  /*
+   * SAFARI MOBILE FIX — width/height 100% + object-fit: contain prevents
+   * cropping while keeping the image anchored to the frame.
+   *
+   * width:auto / height:auto let the element collapse to 0×0 during
+   * Safari's async decode pass (even for cached images), causing the
+   * frame to reflow mid-animation → the jitter the user reported.
+   *
+   * With 100% dimensions the frame always has a stable box to animate;
+   * object-fit: contain ensures the image scales proportionally inside
+   * it — never cropped, never stretched beyond natural size.
+   */
+  width:  100%;
+  height: 100%;
   /* vh fallback first; dvh overrides it in browsers that support it.
      dvh tracks the visible viewport correctly after rotation/keyboard pop.
      The 8rem budget: 3.2rem top + 3.6rem bottom padding + counter row. */
@@ -1106,20 +1132,51 @@ const Lightbox = (() => {
 
     _triggerEl = triggerEl ?? null;
 
-    currentIndex          = poolIndex;
-    DOM.lbImg.src         = poolPaths[poolIndex];
+    currentIndex = poolIndex;
+
+    /*
+     * SAFARI MOBILE FIX — set the animation class first, then defer the
+     * src assignment.  anim-open fades in from opacity:0, so the single
+     * blank frame before the image appears is invisible to the user, but
+     * it prevents the frame from collapsing on first open (same root
+     * cause as the navigate() fix above).
+     */
     DOM.lbFrame.className = 'lb-frame anim-open';
     DOM.lightbox.classList.add('on');
     updateCounter();
+
+    const firstSrc = poolPaths[poolIndex];
+    requestAnimationFrame(() => { DOM.lbImg.src = firstSrc; });
 
     // Move focus into the lightbox for keyboard and AT users
     document.getElementById('lb-close')?.focus();
   };
 
   const navigate = (direction) => {
-    currentIndex  = (currentIndex + direction + totalCount) % totalCount;
+    currentIndex = (currentIndex + direction + totalCount) % totalCount;
     playFrameAnimation(direction > 0 ? 'anim-l' : 'anim-r');
-    DOM.lbImg.src = poolPaths[currentIndex];
+
+    /*
+     * SAFARI MOBILE FIX — defer src swap by one rAF.
+     *
+     * Setting img.src synchronously inside the same call as
+     * playFrameAnimation (which forces a reflow via offsetWidth) causes
+     * Safari to:
+     *   1. Clear the old image intrinsic size immediately.
+     *   2. Start the CSS slide animation on a 0×0 frame.
+     *   3. Pop the new image in once its async decode finishes.
+     *
+     * Waiting one requestAnimationFrame lets the animation's first
+     * composited frame reach the screen before the image dimensions
+     * change, eliminating the snap/jitter.
+     *
+     * The captured index is closed over so rapid navigation still
+     * shows the correct image even if currentIndex advances again
+     * before the rAF fires.
+     */
+    const nextSrc = poolPaths[currentIndex];
+    requestAnimationFrame(() => { DOM.lbImg.src = nextSrc; });
+
     updateCounter();
   };
 
