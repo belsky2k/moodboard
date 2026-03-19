@@ -438,14 +438,14 @@ body::after {
 <!-- =========================================================================
      LIGHTBOX
      ========================================================================= -->
-<div class="lb" id="lb">
-  <button class="lb-close"            id="lb-close">[ close ]</button>
-  <button class="lb-arrow lb-arrow-l" id="lb-prev">&#8249;</button>
-  <button class="lb-arrow lb-arrow-r" id="lb-next">&#8250;</button>
+<div class="lb" id="lb" role="dialog" aria-modal="true" aria-label="Image viewer">
+  <button class="lb-close"            id="lb-close" aria-label="Close image viewer">[ close ]</button>
+  <button class="lb-arrow lb-arrow-l" id="lb-prev"  aria-label="Previous image">&#8249;</button>
+  <button class="lb-arrow lb-arrow-r" id="lb-next"  aria-label="Next image">&#8250;</button>
   <div class="lb-frame anim-open" id="lb-frame">
     <img id="lb-img" src="" alt="" />
   </div>
-  <div class="lb-counter" id="lb-counter"></div>
+  <div class="lb-counter" id="lb-counter" aria-live="polite" aria-atomic="true"></div>
 </div>
 
 
@@ -479,6 +479,19 @@ const IMAGE_CATALOGUE = [
 
 
 /* ==========================================================================
+   VIEWPORT UTILITY
+   Defined early — used by both CARD_ENTRY_ROW_STEP and GridSystem.
+   ========================================================================== */
+
+/**
+ * Resolve the column count for the given viewport width.
+ * Single source of truth — used by GridSystem and CARD_ENTRY_ROW_STEP.
+ */
+const getColumnCount = (width = window.innerWidth) =>
+  width < 700 ? 3 : width < 1100 ? 5 : 7;
+
+
+/* ==========================================================================
    CARD CONSTANTS
    ========================================================================== */
 
@@ -487,11 +500,11 @@ const CARD_ROTATIONS = [-8, -6, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6, 8];
 const CARD_ENTRY_DURATION = 0.20;   // s — animation duration per card
 const CARD_ENTRY_COL_STEP = 0.026;  // s — added delay per column
 // Row step: ensures all cards in row N finish before row N+1 starts.
-// The col multiplier (3/5/6) is intentionally one step larger than the
-// max column index for the 3- and 5-column layouts, giving a small extra
-// visual pause between rows on smaller viewports.
+// The col multiplier equals columnCount (one beyond the max index) to
+// guarantee all cards in row N animate out before row N+1 starts.
+// FIX: was hardcoded to 6 for wide screens — GridSystem uses 7 columns.
 const CARD_ENTRY_ROW_STEP = (
-  (window.innerWidth < 700 ? 3 : window.innerWidth < 1100 ? 5 : 6)
+  getColumnCount()
   * CARD_ENTRY_COL_STEP + CARD_ENTRY_DURATION + 0.055
 );
 
@@ -533,13 +546,6 @@ const springStep = (pos, vel, target, stiffness, damping) => {
   const newVel = vel * damping + (target - pos) * stiffness;
   return { pos: pos + newVel, vel: newVel };
 };
-
-/**
- * Resolve the column count for the given viewport width.
- * Single source of truth — used by GridSystem and CARD_ENTRY_ROW_STEP.
- */
-const getColumnCount = (width = window.innerWidth) =>
-  width < 700 ? 3 : width < 1100 ? 5 : 7;
 
 /**
  * Safe localStorage wrapper.
@@ -661,7 +667,7 @@ const GridSystem = (() => {
    * @param {(state: object, x: number, y: number) => void} onCenterUpdate
    */
   const observeResize = (cards, onCenterUpdate) => {
-    const handleResize = (newWidth, newHeight) => {
+    const handleResize = (newHeight) => {
       if (Math.abs(newHeight - viewportHeight) < 2) return;
 
       viewportHeight = newHeight;
@@ -672,8 +678,8 @@ const GridSystem = (() => {
     };
 
     const ro = new ResizeObserver((entries) => {
-      const { width, height } = entries[0].contentRect;
-      handleResize(width, height);
+      const { height } = entries[0].contentRect;
+      handleResize(height);
     });
     ro.observe(document.documentElement);
 
@@ -758,6 +764,9 @@ const CardFactory = (() => {
     const el = document.createElement('div');
     el.className = 'card';
     el.dataset.poolIdx = poolIndex;
+    el.setAttribute('tabindex', '0');
+    el.setAttribute('role', 'button');
+    el.setAttribute('aria-label', `View image ${poolIndex + 1}`);
     el.style.setProperty('--init-rot', `rotate(${baseRotation}deg)`);
     el.style.height = GridSystem.getCardHeight().toFixed(2) + 'px';
     el.style.zIndex = (row + 1) * 2;
@@ -767,7 +776,11 @@ const CardFactory = (() => {
     const img = document.createElement('img');
     img.decoding    = 'async';
     img.dataset.src = imagePath;
-    img.onerror     = () => { el.style.background = '#1a1815'; };
+    // FIX: use CSS variable --bg instead of hardcoded colour literal
+    img.onerror     = () => {
+      el.style.background = getComputedStyle(document.documentElement)
+        .getPropertyValue('--bg').trim() || '#0E0D0C';
+    };
     el.appendChild(img);
 
     // --- Staggered entry animation ---
@@ -813,10 +826,16 @@ const CardFactory = (() => {
       el.style.transform = `rotate(${baseRotation}deg)`;
       setTimeout(markReady, 0);
     } else {
-      el.addEventListener('animationend', markReady);
+      // FIX: cancel the fallback timer when animationend fires normally,
+      // so markReady() isn't called twice and the timer GC's promptly.
+      let fallbackTimer = null;
+      el.addEventListener('animationend', () => {
+        clearTimeout(fallbackTimer);
+        markReady();
+      }, { once: true });
       // Fallback: browser may throttle animations in backgrounded tabs
       const fallbackMs = (parseFloat(entryDelay) + CARD_ENTRY_DURATION + 0.15) * 1000;
-      setTimeout(markReady, fallbackMs);
+      fallbackTimer = setTimeout(markReady, fallbackMs);
     }
 
     return { el, state };
@@ -1058,7 +1077,10 @@ const Lightbox = (() => {
   const isOpen = () => DOM.lightbox.classList.contains('on');
 
   const updateCounter = () => {
+    const label = `Image ${currentIndex + 1} of ${totalCount}`;
     DOM.lbCounter.textContent = `${currentIndex + 1} / ${totalCount}`;
+    // Update alt for screen readers so they announce the current position
+    DOM.lbImg.alt = label;
   };
 
   /**
@@ -1072,7 +1094,9 @@ const Lightbox = (() => {
     DOM.lbFrame.className = `lb-frame ${animClass}`;
   };
 
-  const open = (poolIndex) => {
+  let _triggerEl = null;   // element that opened the lightbox — focus returns here on close
+
+  const open = (poolIndex, triggerEl) => {
     if (isOpen()) return;
 
     // If close() left a pending src-clear timer, cancel it before it
@@ -1080,11 +1104,16 @@ const Lightbox = (() => {
     clearTimeout(clearSrcTimer);
     clearSrcTimer = null;
 
+    _triggerEl = triggerEl ?? null;
+
     currentIndex          = poolIndex;
     DOM.lbImg.src         = poolPaths[poolIndex];
     DOM.lbFrame.className = 'lb-frame anim-open';
     DOM.lightbox.classList.add('on');
     updateCounter();
+
+    // Move focus into the lightbox for keyboard and AT users
+    document.getElementById('lb-close')?.focus();
   };
 
   const navigate = (direction) => {
@@ -1103,6 +1132,10 @@ const Lightbox = (() => {
       DOM.lbImg.src = '';
       clearSrcTimer = null;
     }, 300);
+
+    // Return focus to the card that triggered the lightbox
+    _triggerEl?.focus();
+    _triggerEl = null;
   };
 
   const init = (paths, count) => {
@@ -1143,6 +1176,8 @@ const Lightbox = (() => {
     }, { passive: true });
 
     DOM.lightbox.addEventListener('touchend', (e) => {
+      // FIX: guard against empty changedTouches (edge case on some browsers)
+      if (!e.changedTouches.length) return;
       const deltaX = e.changedTouches[0].clientX - swipeStartX;
       if (Math.abs(deltaX) > 48) navigate(deltaX < 0 ? 1 : -1);
     });
@@ -1282,7 +1317,17 @@ const bootstrap = () => {
     if (DOM.lightbox.classList.contains('on')) return;
     const cardEl = e.target.closest('.card');
     if (!cardEl) return;
-    Lightbox.open(Number(cardEl.dataset.poolIdx));
+    Lightbox.open(Number(cardEl.dataset.poolIdx), cardEl);
+  });
+
+  // Keyboard activation for cards (Enter / Space) — pairs with tabindex+role
+  DOM.grid.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    if (DOM.lightbox.classList.contains('on')) return;
+    const cardEl = e.target.closest('.card');
+    if (!cardEl) return;
+    e.preventDefault();
+    Lightbox.open(Number(cardEl.dataset.poolIdx), cardEl);
   });
 
   PhysicsEngine.init(cardStates);
