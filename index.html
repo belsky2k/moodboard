@@ -180,29 +180,53 @@ body::after {
   justify-content: center;
   border-radius: 14px;
   overflow: hidden;
-  flex-shrink: 1;
-  min-width: 0;
-  min-height: 0;
 
   /*
-   * SAFARI MOBILE FIX — promote the frame to its own GPU compositor layer.
-   * translateZ(0) achieves GPU-promotion without stacking-context side effects
-   * that can clip position:fixed children in some Safari versions.
+   * JITTER FIX 1/3 — stable, fixed dimensions.
+   *
+   * Previously the frame was flex-shrink:1 with no explicit size, so its
+   * box was driven by the <img> intrinsic dimensions. The jitter sequence:
+   *
+   *   img.src changes → browser clears intrinsic size → frame collapses to 0×0
+   *   → slide animation runs on a 0×0 box → new image decoded → frame expands
+   *   → visible snap / jump.
+   *
+   * Giving the frame the same footprint as the image's max-width/max-height
+   * constraints (matching the .lb padding budget: 6.4rem h, 8rem v) means
+   * the box is always the full available area, completely decoupled from the
+   * image's intrinsic size. object-fit:contain on the img handles proportional
+   * scaling inside this stable container.
+   *
+   * Safe-area budget mirrors the .lb padding values:
+   *   horizontal: 3.2rem left + 3.2rem right = 6.4rem
+   *   vertical:   3.2rem top  + 3.6rem bottom + ~1rem counter ≈ 8rem
+   */
+  width:  calc(100vw  - 6.4rem);
+  height: calc(100vh  - 8rem);
+  height: calc(100dvh - 8rem);   /* dvh tracks visible area after keyboard pop */
+
+  /*
+   * JITTER FIX 2/3 — preserve GPU compositor layer across animations.
+   *
+   * The original keyframe `to { transform: none }` was resetting this
+   * translateZ(0) after every navigation, causing the frame to fall off the
+   * GPU layer. The next swipe would re-promote it — producing a repaint flash.
+   * The keyframes below now end at `translateZ(0)` to keep the layer alive.
+   *
+   * translateZ(0) instead of will-change:transform to avoid creating a new
+   * stacking context that clips position:fixed children in some Safari builds.
    */
   transform: translateZ(0);
+  /* Hint the compositor that transform+opacity will animate — avoids
+     promoting at animation start which itself can flash on low-end devices. */
+  will-change: transform, opacity;
 }
 
 .lb-frame img {
   display: block;
-  /*
-   * SAFARI MOBILE FIX — width/height 100% + object-fit: contain prevents
-   * the frame from collapsing to 0×0 during Safari's async decode pass.
-   */
+  /* Frame is now fixed-size; width/height:100% fills it exactly. */
   width:  100%;
   height: 100%;
-  max-width:  calc(100vw  - 6.4rem);
-  max-height: calc(100vh  - 8rem);
-  max-height: calc(100dvh - 8rem);
   object-fit: contain;
   filter: contrast(1.06) saturate(0.85);
   border-radius: 14px;
@@ -393,16 +417,22 @@ body::after {
 }
 
 @keyframes lbOpen {
-  from { opacity: 0; transform: scale(.96) skewX(-1deg); }
-  to   { opacity: 1; transform: scale(1)   skewX(0);     }
+  from { opacity: 0; transform: scale(.96) skewX(-1deg) translateZ(0); }
+  to   { opacity: 1; transform: scale(1)   skewX(0)     translateZ(0); }
 }
 @keyframes lbSlideL {
-  from { opacity: 0; transform: translateX( 28px) scale(.97); }
-  to   { opacity: 1; transform: none; }
+  /*
+   * JITTER FIX 2/3 — end state is translateZ(0), not `none`.
+   * `transform: none` removes the translateZ(0) that keeps lb-frame on
+   * the GPU compositor layer. After each navigation the layer was lost,
+   * and the next swipe had to re-promote — causing a repaint flash on mobile.
+   */
+  from { opacity: 0; transform: translateX( 28px) scale(.97) translateZ(0); }
+  to   { opacity: 1; transform: translateZ(0); }
 }
 @keyframes lbSlideR {
-  from { opacity: 0; transform: translateX(-28px) scale(.97); }
-  to   { opacity: 1; transform: none; }
+  from { opacity: 0; transform: translateX(-28px) scale(.97) translateZ(0); }
+  to   { opacity: 1; transform: translateZ(0); }
 }
 
 @keyframes spinOrbit { to { transform: rotate(360deg); } }
@@ -1197,29 +1227,97 @@ const Lightbox = (() => {
     const firstSrc = poolPaths[poolIndex];
     requestAnimationFrame(() => { DOM.lbImg.src = firstSrc; });
 
+    // Warm up neighbours immediately so first swipe feels instant.
+    preloadAdjacent(currentIndex);
+
     // FIX: install focus trap so Tab cycles within the lightbox dialog
     removeFocusTrap = trapFocus(DOM.lightbox);
 
     document.getElementById('lb-close')?.focus();
   };
 
+  /*
+   * JITTER FIX 3/3 — decode-aware src swap with stale-navigation guard.
+   *
+   * Root cause of the "blank flash" between old and new image on mobile WebKit:
+   * A single rAF is not enough. WebKit decodes images asynchronously; setting
+   * img.src triggers the decode but pixels are not ready until it completes.
+   * Result: old img clears → 1–3 blank frames → new img paints.
+   *
+   * Fix strategy:
+   *   1. Capture a navId so rapid taps discard stale callbacks.
+   *   2. Create an off-screen probe Image with decoding="async".
+   *   3. After probe.onload, call probe.decode() — resolves when pixels are
+   *      composited and ready to paint with zero blank frames.
+   *   4. Race the decode promise against a 250 ms safety timeout so a slow
+   *      connection never freezes the UI. 250 ms ≈ the slide animation
+   *      duration, so in the worst case the swap happens as the animation ends
+   *      — invisible to the user.
+   *   5. On resolution, defer one rAF so the swap lands on the next
+   *      compositor frame (not mid-JS-task, which can tear on some drivers).
+   *   6. After each navigation preload the two neighbouring images so the
+   *      next swipe always hits a warm cache.
+   */
+
+  let _navId = 0;   // monotonic counter; guards stale swap callbacks
+
+  /** Preload src off-screen (decode included) so subsequent navigations are instant. */
+  const preloadImage = (src) => {
+    const img = new Image();
+    img.decoding = 'async';
+    // Start the network fetch; the browser caches the result.
+    // decode() ensures the image is painted-ready, not just downloaded.
+    img.src = src;
+    img.decode?.().catch(() => {}); // silent — preload is best-effort
+  };
+
+  const preloadAdjacent = (idx) => {
+    preloadImage(poolPaths[(idx - 1 + totalCount) % totalCount]);
+    preloadImage(poolPaths[(idx + 1)              % totalCount]);
+  };
+
   const navigate = (direction) => {
     currentIndex = (currentIndex + direction + totalCount) % totalCount;
+    const nextSrc   = poolPaths[currentIndex];
+    const thisNavId = ++_navId;   // capture before any async work
+
+    // Slide animation starts immediately — frame has fixed dimensions now,
+    // so the forced reflow in playFrameAnimation does not cause a size jump.
     playFrameAnimation(direction > 0 ? 'anim-l' : 'anim-r');
-
-    /*
-     * SAFARI MOBILE FIX — defer src swap by one rAF.
-     * nextSrc is captured after currentIndex update so rapid navigation still
-     * resolves the correct image even if currentIndex advances before the rAF fires.
-     */
-    const nextSrc = poolPaths[currentIndex];
-    requestAnimationFrame(() => { DOM.lbImg.src = nextSrc; });
-
     updateCounter();
+
+    // --- Decode-aware swap ---
+
+    const doSwap = () => requestAnimationFrame(() => {
+      if (_navId !== thisNavId) return;   // user navigated again — skip
+      DOM.lbImg.src = nextSrc;
+    });
+
+    // Build a decode promise: fetch + pixel-ready confirmation.
+    const decodeReady = new Promise((resolve) => {
+      const probe = new Image();
+      probe.decoding = 'async';
+      probe.onload  = () => (probe.decode?.() ?? Promise.resolve())
+                              .then(resolve).catch(resolve);
+      probe.onerror = resolve;   // broken image → still swap, show error state
+      probe.src = nextSrc;
+    });
+
+    // Safety net: never block longer than the slide animation itself.
+    const timeout = new Promise(r => setTimeout(r, 250));
+
+    Promise.race([decodeReady, timeout]).then(doSwap);
+
+    // Warm up neighbours so the next swipe is instant.
+    preloadAdjacent(currentIndex);
   };
 
   const close = () => {
     DOM.lightbox.classList.remove('on');
+
+    // Invalidate any in-flight decode callback so it doesn't overwrite src
+    // after the lightbox is already closed (e.g. user closes mid-navigate).
+    ++_navId;
 
     // FIX: remove focus trap when lightbox closes
     removeFocusTrap?.();
