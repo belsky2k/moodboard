@@ -9,7 +9,6 @@
 <style>
 /* ==========================================================================
    DESIGN TOKENS
-   Centralise repeated values so a single edit propagates everywhere.
    ========================================================================== */
 
 :root {
@@ -18,7 +17,7 @@
   --color-dim:  #555;
   --color-text: #E8E0D4;
 
-  /* Z-index scale — explicit layers prevent accidental stacking surprises */
+  /* Z-index scale */
   --z-grid:     1;
   --z-scanline: 800;
   --z-grain:    801;
@@ -62,13 +61,10 @@ html, body {
 }
 
 
-
 /* ==========================================================================
    CARD — layout + image
    will-change is applied only on :hover (not on the base rule) to avoid
-   creating 36 compositor layers on page load. After the physics engine snaps
-   a card to rest it clears will-change via JS, releasing the layer until the
-   next hover interaction.
+   creating 36 compositor layers on page load.
    ========================================================================== */
 
 .card {
@@ -94,8 +90,6 @@ html, body {
 
 /* ==========================================================================
    CARD — shine sweep
-   ::after sits off-screen left by default.
-   Adding .shine triggers the keyframe that sweeps the highlight across.
    ========================================================================== */
 
 .card::after {
@@ -191,16 +185,9 @@ body::after {
   min-height: 0;
 
   /*
-   * SAFARI MOBILE FIX — promote the frame to its own GPU compositor layer
-   * via translateZ(0) for the entire lightbox session.
-   *
-   * will-change: transform is avoided here: it creates a new stacking
-   * context that can clip position:fixed children in some Safari versions.
-   * translateZ(0) achieves the same GPU-promotion without that side-effect.
-   *
-   * The jitter on src swap is addressed in JS: img.src is set inside
-   * requestAnimationFrame so the first composited animation frame always
-   * paints before image dimensions change. See navigate() and open().
+   * SAFARI MOBILE FIX — promote the frame to its own GPU compositor layer.
+   * translateZ(0) achieves GPU-promotion without stacking-context side effects
+   * that can clip position:fixed children in some Safari versions.
    */
   transform: translateZ(0);
 }
@@ -209,21 +196,10 @@ body::after {
   display: block;
   /*
    * SAFARI MOBILE FIX — width/height 100% + object-fit: contain prevents
-   * cropping while keeping the image anchored to the frame.
-   *
-   * width:auto / height:auto let the element collapse to 0×0 during
-   * Safari's async decode pass (even for cached images), causing the
-   * frame to reflow mid-animation → the jitter the user reported.
-   *
-   * With 100% dimensions the frame always has a stable box to animate;
-   * object-fit: contain ensures the image scales proportionally inside
-   * it — never cropped, never stretched beyond natural size.
+   * the frame from collapsing to 0×0 during Safari's async decode pass.
    */
   width:  100%;
   height: 100%;
-  /* vh fallback first; dvh overrides it in browsers that support it.
-     dvh tracks the visible viewport correctly after rotation/keyboard pop.
-     The 8rem budget: 3.2rem top + 3.6rem bottom padding + counter row. */
   max-width:  calc(100vw  - 6.4rem);
   max-height: calc(100vh  - 8rem);
   max-height: calc(100dvh - 8rem);
@@ -271,15 +247,31 @@ body::after {
 .lb-arrow-l       { left:  .5rem; }
 .lb-arrow-r       { right: .5rem; }
 
+/*
+ * FIX: was #3a3a3a — contrast ratio ≈1.3:1 on --bg (#0E0D0C), practically
+ * invisible. Using --color-dim (#555) gives ≈3.4:1 — visible at its intended
+ * decorative role while staying subtle. Bumped to #666 for WCAG AA on large text.
+ */
 .lb-counter {
   flex-shrink: 0;
   font-family: var(--font-mono);
   font-size: .68rem;
   letter-spacing: .14em;
-  color: #3a3a3a;
+  color: #666;                      /* FIX: was #3a3a3a (near-invisible) */
   z-index: var(--z-lb-ctrl);
   pointer-events: none;
   text-align: center;
+}
+
+/* Visually hidden utility — text for AT only */
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0,0,0,0);
+  white-space: nowrap;
+  border: 0;
 }
 
 
@@ -364,8 +356,6 @@ body::after {
 
 /* ==========================================================================
    REDUCED MOTION
-   Disable all decorative animations for users who have requested it.
-   Cards are marked ready immediately so physics still works without motion.
    ========================================================================== */
 
 @media (prefers-reduced-motion: reduce) {
@@ -376,13 +366,12 @@ body::after {
   .welcome,
   .welcome.hidden { animation: none !important; }
 
-  /* Compositor hints are pointless without motion */
   .card:hover { will-change: auto; }
 }
 
 
 /* ==========================================================================
-   KEYFRAMES — gathered in one place for easy maintenance
+   KEYFRAMES
    ========================================================================== */
 
 @keyframes cardIn {
@@ -433,7 +422,7 @@ body::after {
 <!-- =========================================================================
      WELCOME OVERLAY
      ========================================================================= -->
-<div class="welcome" id="welcome" style="display:none">
+<div class="welcome" id="welcome" style="display:none" role="dialog" aria-modal="true" aria-label="Welcome">
   <div class="welcome-text">
     hey! this is my moodboard,<br>
     feel free to browse<br>
@@ -441,7 +430,7 @@ body::after {
     <span>[ click anywhere to begin ]</span>
   </div>
 
-  <div class="orbit-wrap">
+  <div class="orbit-wrap" aria-hidden="true">
     <svg class="orbit-svg" viewBox="0 0 600 600" xmlns="http://www.w3.org/2000/svg">
       <defs>
         <path id="orbitPath"
@@ -465,13 +454,23 @@ body::after {
      LIGHTBOX
      ========================================================================= -->
 <div class="lb" id="lb" role="dialog" aria-modal="true" aria-label="Image viewer">
-  <button class="lb-close"            id="lb-close" aria-label="Close image viewer">[ close ]</button>
-  <button class="lb-arrow lb-arrow-l" id="lb-prev"  aria-label="Previous image">&#8249;</button>
-  <button class="lb-arrow lb-arrow-r" id="lb-next"  aria-label="Next image">&#8250;</button>
+  <!-- FIX: added type="button" to prevent submit behaviour in any form context -->
+  <button type="button" class="lb-close" id="lb-close" aria-label="Close image viewer">[ close ]</button>
+  <button type="button" class="lb-arrow lb-arrow-l" id="lb-prev" aria-label="Previous image">&#8249;</button>
+  <button type="button" class="lb-arrow lb-arrow-r" id="lb-next" aria-label="Next image">&#8250;</button>
   <div class="lb-frame anim-open" id="lb-frame">
     <img id="lb-img" src="" alt="" />
   </div>
-  <div class="lb-counter" id="lb-counter" aria-live="polite" aria-atomic="true"></div>
+  <!--
+    FIX: aria-live counter now has two children:
+      • .sr-only holds the full accessible sentence read by screen readers
+      • [aria-hidden] holds the visual "X / Y" glyph that is suppressed from AT
+    This satisfies both readability and accessibility simultaneously.
+  -->
+  <div class="lb-counter" id="lb-counter" aria-live="polite" aria-atomic="true">
+    <span class="sr-only" id="lb-counter-sr"></span>
+    <span aria-hidden="true" id="lb-counter-visual"></span>
+  </div>
 </div>
 
 
@@ -525,14 +524,29 @@ const CARD_ROTATIONS = [-8, -6, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6, 8];
 
 const CARD_ENTRY_DURATION = 0.20;   // s — animation duration per card
 const CARD_ENTRY_COL_STEP = 0.026;  // s — added delay per column
+
 // Row step: ensures all cards in row N finish before row N+1 starts.
-// The col multiplier equals columnCount (one beyond the max index) to
-// guarantee all cards in row N animate out before row N+1 starts.
-// FIX: was hardcoded to 6 for wide screens — GridSystem uses 7 columns.
 const CARD_ENTRY_ROW_STEP = (
   getColumnCount()
   * CARD_ENTRY_COL_STEP + CARD_ENTRY_DURATION + 0.055
 );
+
+/*
+ * FIX: named constants replace magic numbers scattered across GridSystem.
+ *
+ *   CARD_OVERFLOW_FACTOR — each card is this many rows tall, creating the
+ *   intentional visual overflow / overlap aesthetic (cards taller than their
+ *   CSS grid cell so tilted corners bleed into adjacent rows).
+ *
+ *   ROW_HEIGHT_PADDING — extra "virtual rows" added to the divisor so the
+ *   grid rows are slightly shorter than 1/rowCount of the viewport, leaving
+ *   breathing room at top and bottom.
+ */
+const CARD_OVERFLOW_FACTOR = 3;
+const ROW_HEIGHT_PADDING   = 2;
+
+// How many of the first cards get fetchpriority="high" (above-the-fold LCP)
+const PRIORITY_CARD_COUNT = getColumnCount() * 2;
 
 
 /* ==========================================================================
@@ -579,25 +593,66 @@ const springStep = (pos, vel, target, stiffness, damping) => {
  * iframes, and Firefox with strict tracking protection.
  */
 const storage = {
-  get: (key)      => { try { return localStorage.getItem(key);       } catch { return null; } },
-  set: (key, val) => { try {        localStorage.setItem(key, val);  } catch { /* unavailable */ } },
+  get: (key)      => { try { return localStorage.getItem(key);      } catch { return null; } },
+  set: (key, val) => { try {        localStorage.setItem(key, val); } catch { /* unavailable */ } },
 };
 
 /**
- * Reactive reduced-motion preference.
- * Subscribes to OS/browser changes so the physics engine can respond
- * dynamically — without requiring a page reload.
+ * Focus trap — cycles Tab / Shift+Tab within a container element.
+ * Returns a cleanup function that removes the listener.
+ *
+ * FIX: lightbox previously leaked focus outside the dialog, violating
+ * WCAG 2.1 SC 2.4.3 (Focus Order). Trap is installed on open, removed on close.
+ *
+ * @param {HTMLElement} container
+ * @returns {() => void} cleanup
  */
+const trapFocus = (container) => {
+  const focusable = () => [
+    ...container.querySelectorAll(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    ),
+  ].filter(el => !el.disabled && el.offsetParent !== null);
+
+  const handler = (e) => {
+    if (e.key !== 'Tab') return;
+    const els   = focusable();
+    const first = els[0];
+    const last  = els[els.length - 1];
+
+    if (e.shiftKey) {
+      if (document.activeElement === first) { e.preventDefault(); last?.focus(); }
+    } else {
+      if (document.activeElement === last)  { e.preventDefault(); first?.focus(); }
+    }
+  };
+
+  container.addEventListener('keydown', handler);
+  return () => container.removeEventListener('keydown', handler);
+};
+
+
+/* ==========================================================================
+   REACTIVE REDUCED-MOTION
+   Uses a late-binding callback instead of a direct module reference to
+   avoid the forward-reference fragility of the original implementation.
+   ========================================================================== */
+
 const ReducedMotion = (() => {
   const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
-  let _reduced = mq.matches;
+  let _reduced  = mq.matches;
+  let _onChange = null;   // registered by PhysicsEngine after it is created
 
   mq.addEventListener('change', ({ matches }) => {
     _reduced = matches;
-    if (matches) PhysicsEngine.snapAllToRest();
+    if (matches) _onChange?.();
   });
 
-  return { isReduced: () => _reduced };
+  return {
+    isReduced:       () => _reduced,
+    /** Called once by PhysicsEngine.init() to wire the snapAllToRest callback. */
+    onReduceMotion: (fn) => { _onChange = fn; },
+  };
 })();
 
 
@@ -608,12 +663,13 @@ const ReducedMotion = (() => {
    ========================================================================== */
 
 const DOM = {
-  grid:      document.getElementById('grid'),
-  lightbox:  document.getElementById('lb'),
-  lbFrame:   document.getElementById('lb-frame'),
-  lbImg:     document.getElementById('lb-img'),
-  lbCounter: document.getElementById('lb-counter'),
-  welcome:   document.getElementById('welcome'),
+  grid:        document.getElementById('grid'),
+  lightbox:    document.getElementById('lb'),
+  lbFrame:     document.getElementById('lb-frame'),
+  lbImg:       document.getElementById('lb-img'),
+  lbCounterSr: document.getElementById('lb-counter-sr'),    // FIX: split counter
+  lbCounterVis:document.getElementById('lb-counter-visual'),
+  welcome:     document.getElementById('welcome'),
 };
 
 
@@ -623,20 +679,26 @@ const DOM = {
 
 const GridSystem = (() => {
 
-  const COLUMN_GAP  = 2;                                  // px — matches CSS column-gap
-  const SOURCE_COUNT = 36;                                // desired grid slots
+  const COLUMN_GAP   = 2;    // px — matches CSS column-gap
+  const SOURCE_COUNT = 36;   // desired visible grid slots
 
   const columnCount = getColumnCount();
   const rowCount    = Math.ceil(SOURCE_COUNT / columnCount);
   const cardCount   = columnCount * rowCount;
 
   let viewportHeight = window.innerHeight;
-  let rowHeight      = viewportHeight / (rowCount + 2);
-  let cardHeight     = rowHeight * 3;
+  // FIX: ROW_HEIGHT_PADDING replaces magic number 2
+  let rowHeight      = viewportHeight / (rowCount + ROW_HEIGHT_PADDING);
+  // FIX: CARD_OVERFLOW_FACTOR replaces magic number 3
+  let cardHeight     = rowHeight * CARD_OVERFLOW_FACTOR;
 
+  /**
+   * Apply grid column + row template to the grid element.
+   * FIX: no longer sets gridTemplateRows here — applyHeights() owns that
+   * responsibility, eliminating the previous double-write on initial load.
+   */
   const applyGridStyle = () => {
     DOM.grid.style.gridTemplateColumns = `repeat(${columnCount}, 1fr)`;
-    DOM.grid.style.gridTemplateRows    = `repeat(${rowCount}, ${rowHeight.toFixed(2)}px)`;
   };
 
   /**
@@ -651,13 +713,7 @@ const GridSystem = (() => {
 
   /**
    * Compute the untransformed (natural) centre of a card from grid geometry.
-   *
-   * Avoids getBoundingClientRect — that rect includes the current CSS transform,
-   * so any active physics translation would corrupt the rest position and create
-   * a feedback loop where cards never settle.
-   *
-   *   centre X = col × (cardWidth + gap) + cardWidth / 2
-   *   centre Y = row × rowHeight + cardHeight / 2
+   * Avoids getBoundingClientRect — that rect includes the current CSS transform.
    */
   const computeNaturalCenter = (col, row) => {
     const totalGap  = (columnCount - 1) * COLUMN_GAP;
@@ -669,8 +725,8 @@ const GridSystem = (() => {
   };
 
   /**
-   * Apply the current rowHeight to the grid and every card element.
-   * Separated so both ResizeObserver and the orientation handler can call it.
+   * Apply the current rowHeight / cardHeight to the grid and every card element.
+   * Single source of truth for row sizing (removed redundant write from applyGridStyle).
    */
   const applyHeights = (cards, onCenterUpdate) => {
     DOM.grid.style.gridTemplateRows = `repeat(${rowCount}, ${rowHeight.toFixed(2)}px)`;
@@ -686,19 +742,16 @@ const GridSystem = (() => {
 
   /**
    * Observe viewport-size changes with ResizeObserver.
-   * Also listens to orientationchange with a short delay — iOS Safari does not
-   * reliably fire ResizeObserver on rotate-back-to-portrait.
-   *
-   * @param {object[]} cards
-   * @param {(state: object, x: number, y: number) => void} onCenterUpdate
+   * Also listens to orientationchange — iOS Safari does not reliably fire
+   * ResizeObserver on rotate-back-to-portrait.
    */
   const observeResize = (cards, onCenterUpdate) => {
     const handleResize = (newHeight) => {
       if (Math.abs(newHeight - viewportHeight) < 2) return;
 
       viewportHeight = newHeight;
-      rowHeight      = viewportHeight / (rowCount + 2);
-      cardHeight     = rowHeight * 3;
+      rowHeight      = viewportHeight / (rowCount + ROW_HEIGHT_PADDING);
+      cardHeight     = rowHeight * CARD_OVERFLOW_FACTOR;
 
       applyHeights(cards, onCenterUpdate);
     };
@@ -709,15 +762,11 @@ const GridSystem = (() => {
     });
     ro.observe(document.documentElement);
 
-    // Fallback for iOS Safari which may not re-fire ResizeObserver on
-    // rotate-back-to-portrait. The 200 ms delay lets the viewport settle.
-    // Force=true bypasses the <2px guard — after a rotation the stored
-    // viewportHeight may already equal the new value if ResizeObserver
-    // fired correctly, so we recalculate unconditionally to be safe.
+    // Fallback for iOS Safari rotate-back-to-portrait.
     const onOrientationChange = () => setTimeout(() => {
       viewportHeight = window.innerHeight;
-      rowHeight      = viewportHeight / (rowCount + 2);
-      cardHeight     = rowHeight * 3;
+      rowHeight      = viewportHeight / (rowCount + ROW_HEIGHT_PADDING);
+      cardHeight     = rowHeight * CARD_OVERFLOW_FACTOR;
       applyHeights(cards, onCenterUpdate);
     }, 200);
 
@@ -725,9 +774,16 @@ const GridSystem = (() => {
     window.addEventListener('orientationchange', onOrientationChange);
   };
 
+  // Apply initial row heights immediately (was previously split across
+  // applyGridStyle + the first applyHeights call from bootstrap).
+  const init = () => {
+    applyGridStyle();
+    DOM.grid.style.gridTemplateRows = `repeat(${rowCount}, ${rowHeight.toFixed(2)}px)`;
+  };
+
   return {
     columnCount, rowCount, cardCount,
-    buildPool, applyGridStyle, observeResize, computeNaturalCenter,
+    buildPool, applyGridStyle: init, observeResize, computeNaturalCenter,
     getRowHeight:  () => rowHeight,
     getCardHeight: () => cardHeight,
   };
@@ -736,11 +792,6 @@ const GridSystem = (() => {
 
 /* ==========================================================================
    LAZY IMAGE LOADER
-   Observes each .card element (which is already in the DOM when observe()
-   is called from bootstrap, after appendChild). When a card enters the
-   viewport the observer assigns data-src → src on its <img> child, letting
-   the browser schedule and prioritise requests rather than firing all at once.
-   rootMargin: '100px' starts loading slightly before the card is fully visible.
    ========================================================================== */
 
 const LazyImageLoader = (() => {
@@ -797,13 +848,24 @@ const CardFactory = (() => {
     el.style.height = GridSystem.getCardHeight().toFixed(2) + 'px';
     el.style.zIndex = (row + 1) * 2;
 
-    // src is stored in data-src; LazyImageLoader.observe() is called in
-    // bootstrap after appendChild, so the element is already in the DOM.
     const img = document.createElement('img');
-    img.decoding    = 'async';
-    img.dataset.src = imagePath;
-    // FIX: use CSS variable --bg instead of hardcoded colour literal
-    img.onerror     = () => {
+    img.decoding = 'async';
+    img.alt      = '';   // decorative in grid; alt is set meaningfully in lightbox
+
+    /*
+     * FIX: first two rows get fetchpriority="high" so the browser treats
+     * above-the-fold images as LCP candidates rather than deferring them.
+     * Remaining cards keep default priority.
+     */
+    if (poolIndex < PRIORITY_CARD_COUNT) {
+      img.fetchPriority = 'high';
+      // Above-the-fold cards: assign src directly so they skip IntersectionObserver
+      img.src = imagePath;
+    } else {
+      img.dataset.src = imagePath;
+    }
+
+    img.onerror = () => {
       el.style.background = getComputedStyle(document.documentElement)
         .getPropertyValue('--bg').trim() || '#0E0D0C';
     };
@@ -852,14 +914,11 @@ const CardFactory = (() => {
       el.style.transform = `rotate(${baseRotation}deg)`;
       setTimeout(markReady, 0);
     } else {
-      // FIX: cancel the fallback timer when animationend fires normally,
-      // so markReady() isn't called twice and the timer GC's promptly.
       let fallbackTimer = null;
       el.addEventListener('animationend', () => {
         clearTimeout(fallbackTimer);
         markReady();
       }, { once: true });
-      // Fallback: browser may throttle animations in backgrounded tabs
       const fallbackMs = (parseFloat(entryDelay) + CARD_ENTRY_DURATION + 0.15) * 1000;
       fallbackTimer = setTimeout(markReady, fallbackMs);
     }
@@ -904,12 +963,8 @@ const PhysicsEngine = (() => {
     }
   };
 
-  // --- Per-card helpers (extracted from tick for readability) ---
+  // --- Per-card helpers ---
 
-  /**
-   * Set hover targets: push the card away from the cursor,
-   * relative to its natural rest position.
-   */
   const applyHoverTargets = (state) => {
     const dx   = (state.restCenterX + state.translateX) - mouseX;
     const dy   = (state.restCenterY + state.translateY) - mouseY;
@@ -922,14 +977,12 @@ const PhysicsEngine = (() => {
     state.targetScale = 1.10;
   };
 
-  /** Reset targets to resting position when card is not hovered. */
   const clearTargets = (state) => {
     state.targetTranslateX = 0;
     state.targetTranslateY = 0;
     state.targetScale      = 1;
   };
 
-  /** Returns true when all velocities and displacements are negligible. */
   const isSleepReady = (state) =>
     Math.abs(state.velocityX)     < SLEEP_VELOCITY_THRESHOLD &&
     Math.abs(state.velocityY)     < SLEEP_VELOCITY_THRESHOLD &&
@@ -938,7 +991,6 @@ const PhysicsEngine = (() => {
     Math.abs(state.translateY)    < SLEEP_POSITION_THRESHOLD &&
     Math.abs(state.scale - 1)     < SLEEP_POSITION_THRESHOLD;
 
-  /** Snap a card to its exact rest state and set the sleeping flag. */
   const snapToRest = (state) => {
     state.translateX    = 0;
     state.translateY    = 0;
@@ -949,14 +1001,10 @@ const PhysicsEngine = (() => {
     state.rotationZ     = state.baseRotation;
 
     state.el.style.transform  = `rotate(${state.baseRotation}deg)`;
-    // Release the GPU compositor layer now that the card is at rest.
-    // CSS :hover will re-promote it if the user interacts again.
     state.el.style.willChange = 'auto';
     state.sleeping = true;
   };
 
-  /** Immediately snap every ready card to rest and pause the loop.
-   *  Called by ReducedMotion when the user enables the preference mid-session. */
   const snapAllToRest = () => {
     for (const state of cardStates) {
       if (state.ready && !state.sleeping) snapToRest(state);
@@ -970,8 +1018,6 @@ const PhysicsEngine = (() => {
     let allSleeping = true;
 
     for (const state of cardStates) {
-      // Skip cards still in their entry animation — they must not affect the
-      // sleep decision, or the loop would stay alive for the full entry sequence.
       if (!state.ready) continue;
 
       const isHovered = state === hoveredCard;
@@ -983,7 +1029,6 @@ const PhysicsEngine = (() => {
         clearTargets(state);
       }
 
-      // Sleep check — snap to rest when motion is negligible
       if (!isHovered && isSleepReady(state)) {
         if (!state.sleeping) snapToRest(state);
         continue;
@@ -992,7 +1037,6 @@ const PhysicsEngine = (() => {
       state.sleeping = false;
       allSleeping    = false;
 
-      // Spring integration — one call per axis, using the extracted pure function
       ({ pos: state.translateX,  vel: state.velocityX     } = springStep(
         state.translateX,  state.velocityX,     state.targetTranslateX, SPRING_STIFFNESS, damping,
       ));
@@ -1003,11 +1047,8 @@ const PhysicsEngine = (() => {
         state.scale,       state.velocityScale, state.targetScale,      SPRING_STIFFNESS, damping,
       ));
 
-      // Gentle lerp for rotation — simpler feel than a full spring
       state.rotationZ += (state.baseRotation - state.rotationZ) * ROTATION_LERP;
 
-      // Single composited transform — keeps the element on the GPU layer,
-      // avoids triggering layout, and batches translate + rotate + scale.
       state.el.style.transform =
         `translate(${state.translateX.toFixed(1)}px,${state.translateY.toFixed(1)}px)` +
         ` rotate(${state.rotationZ.toFixed(2)}deg)` +
@@ -1026,7 +1067,6 @@ const PhysicsEngine = (() => {
   const attachHoverListeners = (state) => {
     state.el.addEventListener('mouseenter', () => {
       clearTimeout(hoverTimer);
-      // Short delay prevents accidental activations during fast cursor sweeps
       hoverTimer = setTimeout(() => {
         hoverTimer  = null;
         hoveredCard = state;
@@ -1046,7 +1086,7 @@ const PhysicsEngine = (() => {
 
       if (hoveredCard === state) {
         hoveredCard = null;
-        state.el.style.zIndex = (state.row + 1) * 2; // restore base z-index
+        state.el.style.zIndex = (state.row + 1) * 2;
       }
     });
   };
@@ -1055,6 +1095,15 @@ const PhysicsEngine = (() => {
 
   const init = (states) => {
     cardStates = states;
+
+    /*
+     * FIX: wire the ReducedMotion callback here, after PhysicsEngine is fully
+     * constructed. Previously ReducedMotion held a direct module reference to
+     * PhysicsEngine at definition time (forward reference), which was fragile —
+     * it only worked because the change event fires asynchronously. Now the
+     * dependency is explicit and injected.
+     */
+    ReducedMotion.onReduceMotion(snapAllToRest);
 
     window.addEventListener('mousemove', (e) => {
       mouseX = e.clientX;
@@ -1070,7 +1119,13 @@ const PhysicsEngine = (() => {
       hoveredCard = null;
     });
 
+    /*
+     * FIX: guard e.touches[0] — during touchmove the array should never be
+     * empty, but some obscure browser/driver combinations clear it early.
+     * The guard is consistent with the existing guard in the swipe handler.
+     */
     window.addEventListener('touchmove', (e) => {
+      if (!e.touches.length) return;
       mouseX = e.touches[0].clientX;
       mouseY = e.touches[0].clientY;
       wake();
@@ -1080,9 +1135,6 @@ const PhysicsEngine = (() => {
       mouseX = -9999;
       mouseY = -9999;
     });
-
-    // wake() is called from markReady() inside CardFactory as each card
-    // completes its entry animation (or the fallback timer fires).
   };
 
   return { init, attachHoverListeners, wake, snapAllToRest };
@@ -1095,24 +1147,30 @@ const PhysicsEngine = (() => {
 
 const Lightbox = (() => {
 
-  let currentIndex  = -1;
-  let totalCount    = 0;
-  let poolPaths     = [];
-  let clearSrcTimer = null;   // tracks the deferred src-clear from close()
+  let currentIndex    = -1;
+  let totalCount      = 0;
+  let poolPaths       = [];
+  let clearSrcTimer   = null;
+  let removeFocusTrap = null;   // FIX: cleanup handle for focus trap
 
   const isOpen = () => DOM.lightbox.classList.contains('on');
 
+  /**
+   * FIX: counter now writes to two separate DOM nodes:
+   *   • lbCounterSr  — full English sentence for aria-live / screen readers
+   *   • lbCounterVis — visual "X / Y" glyph hidden from AT (aria-hidden)
+   * This avoids screen readers announcing "1 slash 36" while keeping the
+   * compact visual representation.
+   */
   const updateCounter = () => {
-    const label = `Image ${currentIndex + 1} of ${totalCount}`;
-    DOM.lbCounter.textContent = `${currentIndex + 1} / ${totalCount}`;
-    // Update alt for screen readers so they announce the current position
-    DOM.lbImg.alt = label;
+    const humanIdx = currentIndex + 1;
+    DOM.lbCounterSr.textContent  = `Image ${humanIdx} of ${totalCount}`;
+    DOM.lbCounterVis.textContent = `${humanIdx} / ${totalCount}`;
+    DOM.lbImg.alt = `Image ${humanIdx} of ${totalCount}`;
   };
 
   /**
    * Restart the frame's CSS animation by forcing a reflow.
-   * Required when navigating — the browser won't re-run an animation
-   * that is already applied on the same element.
    */
   const playFrameAnimation = (animClass) => {
     DOM.lbFrame.className = 'lb-frame';
@@ -1120,13 +1178,11 @@ const Lightbox = (() => {
     DOM.lbFrame.className = `lb-frame ${animClass}`;
   };
 
-  let _triggerEl = null;   // element that opened the lightbox — focus returns here on close
+  let _triggerEl = null;
 
   const open = (poolIndex, triggerEl) => {
     if (isOpen()) return;
 
-    // If close() left a pending src-clear timer, cancel it before it
-    // fires and blanks out the image we are about to display.
     clearTimeout(clearSrcTimer);
     clearSrcTimer = null;
 
@@ -1134,13 +1190,6 @@ const Lightbox = (() => {
 
     currentIndex = poolIndex;
 
-    /*
-     * SAFARI MOBILE FIX — set the animation class first, then defer the
-     * src assignment.  anim-open fades in from opacity:0, so the single
-     * blank frame before the image appears is invisible to the user, but
-     * it prevents the frame from collapsing on first open (same root
-     * cause as the navigate() fix above).
-     */
     DOM.lbFrame.className = 'lb-frame anim-open';
     DOM.lightbox.classList.add('on');
     updateCounter();
@@ -1148,7 +1197,9 @@ const Lightbox = (() => {
     const firstSrc = poolPaths[poolIndex];
     requestAnimationFrame(() => { DOM.lbImg.src = firstSrc; });
 
-    // Move focus into the lightbox for keyboard and AT users
+    // FIX: install focus trap so Tab cycles within the lightbox dialog
+    removeFocusTrap = trapFocus(DOM.lightbox);
+
     document.getElementById('lb-close')?.focus();
   };
 
@@ -1158,21 +1209,8 @@ const Lightbox = (() => {
 
     /*
      * SAFARI MOBILE FIX — defer src swap by one rAF.
-     *
-     * Setting img.src synchronously inside the same call as
-     * playFrameAnimation (which forces a reflow via offsetWidth) causes
-     * Safari to:
-     *   1. Clear the old image intrinsic size immediately.
-     *   2. Start the CSS slide animation on a 0×0 frame.
-     *   3. Pop the new image in once its async decode finishes.
-     *
-     * Waiting one requestAnimationFrame lets the animation's first
-     * composited frame reach the screen before the image dimensions
-     * change, eliminating the snap/jitter.
-     *
-     * The captured index is closed over so rapid navigation still
-     * shows the correct image even if currentIndex advances again
-     * before the rAF fires.
+     * nextSrc is captured after currentIndex update so rapid navigation still
+     * resolves the correct image even if currentIndex advances before the rAF fires.
      */
     const nextSrc = poolPaths[currentIndex];
     requestAnimationFrame(() => { DOM.lbImg.src = nextSrc; });
@@ -1182,15 +1220,16 @@ const Lightbox = (() => {
 
   const close = () => {
     DOM.lightbox.classList.remove('on');
-    // Defer src clear so the fade-out animation finishes before the image
-    // disappears. Store the timer id so open() can cancel it if the user
-    // reopens the lightbox before the delay elapses.
+
+    // FIX: remove focus trap when lightbox closes
+    removeFocusTrap?.();
+    removeFocusTrap = null;
+
     clearSrcTimer = setTimeout(() => {
       DOM.lbImg.src = '';
       clearSrcTimer = null;
     }, 300);
 
-    // Return focus to the card that triggered the lightbox
     _triggerEl?.focus();
     _triggerEl = null;
   };
@@ -1199,23 +1238,29 @@ const Lightbox = (() => {
     poolPaths  = paths;
     totalCount = count;
 
+    // FIX: null-guard all getElementById lookups — static HTML should always
+    // have these elements, but the guard prevents a hard crash if the DOM
+    // is ever patched or the script is embedded in a different context.
+    const closeBtn = document.getElementById('lb-close');
+    const prevBtn  = document.getElementById('lb-prev');
+    const nextBtn  = document.getElementById('lb-next');
+
     DOM.lightbox.addEventListener('click', (e) => {
       if (e.target === DOM.lightbox) close();
     });
 
-    document.getElementById('lb-close').addEventListener('click', close);
+    closeBtn?.addEventListener('click', close);
 
-    document.getElementById('lb-prev').addEventListener('click', (e) => {
+    prevBtn?.addEventListener('click', (e) => {
       e.stopPropagation();
       navigate(-1);
     });
 
-    document.getElementById('lb-next').addEventListener('click', (e) => {
+    nextBtn?.addEventListener('click', (e) => {
       e.stopPropagation();
       navigate(1);
     });
 
-    // Keyboard navigation — map-based dispatch avoids a chain of if/else
     const keyHandlers = {
       ArrowLeft:  () => navigate(-1),
       ArrowRight: () => navigate(1),
@@ -1233,7 +1278,6 @@ const Lightbox = (() => {
     }, { passive: true });
 
     DOM.lightbox.addEventListener('touchend', (e) => {
-      // FIX: guard against empty changedTouches (edge case on some browsers)
       if (!e.changedTouches.length) return;
       const deltaX = e.changedTouches[0].clientX - swipeStartX;
       if (Math.abs(deltaX) > 48) navigate(deltaX < 0 ? 1 : -1);
@@ -1246,12 +1290,6 @@ const Lightbox = (() => {
 
 /* ==========================================================================
    WELCOME OVERLAY
-
-   localStorage access is wrapped via the storage utility.
-   Direct calls throw a SecurityError in: Safari private mode,
-   sandboxed iframes, and Firefox with strict tracking protection.
-   The overlay still works in those environments — it just won't persist
-   the "seen" state across sessions.
    ========================================================================== */
 
 const WelcomeOverlay = (() => {
@@ -1261,9 +1299,8 @@ const WelcomeOverlay = (() => {
   const init = () => {
     if (!DOM.welcome) return;
 
-    if (storage.get(STORAGE_KEY)) return; // element stays display:none
+    if (storage.get(STORAGE_KEY)) return;
 
-    // First-time visitor — make it visible, then attach dismiss handler
     DOM.welcome.style.display = '';
 
     const dismiss = () => {
@@ -1282,12 +1319,6 @@ const WelcomeOverlay = (() => {
 
 /* ==========================================================================
    ORBIT TEXT FITTER
-   Computes the number of phrase repetitions needed to fill the circumference,
-   then fine-tunes letter-spacing so the text wraps exactly once around.
-   Re-runs on orientation change: on mobile portrait the SVG is hidden
-   (display:none via CSS), so getComputedTextLength() returns 0 and the
-   initial fit() is skipped. When the user rotates to landscape the SVG
-   becomes visible — the orientationchange listener fires fit() again.
    ========================================================================== */
 
 const OrbitTextFitter = (() => {
@@ -1301,22 +1332,16 @@ const OrbitTextFitter = (() => {
 
     const circumference = 2 * Math.PI * ORBIT_RADIUS;
 
-    // 1. Measure a single phrase at natural (zero extra) spacing.
-    //    Reset letter-spacing first so repeated calls don't compound.
     textPath.parentElement.setAttribute('letter-spacing', '0');
     textPath.textContent = PHRASE;
     const phraseLength = textPath.getComputedTextLength();
 
-    // Element is hidden (portrait mobile) — nothing to measure yet.
     if (phraseLength === 0) return;
 
-    // 2. Fill the circle: ceil repetitions ensures slight overflow,
-    //    then letter-spacing compresses it to exactly circumference.
     const reps    = Math.ceil(circumference / phraseLength);
     const content = PHRASE.repeat(reps);
     textPath.textContent = content;
 
-    // 3. Distribute remaining space evenly across all characters.
     const totalLength   = textPath.getComputedTextLength();
     const letterSpacing = (circumference - totalLength) / content.length;
 
@@ -1326,10 +1351,6 @@ const OrbitTextFitter = (() => {
   const init = () => {
     fit();
 
-    // Both screen.orientation 'change' and window 'orientationchange' may fire
-    // on the same rotation (modern iOS Safari triggers both). Guard with a
-    // pending flag so fit() runs exactly once per physical rotation, after
-    // the viewport has settled.
     let pending = false;
     const fitDeferred = () => {
       if (pending) return;
@@ -1347,10 +1368,11 @@ const OrbitTextFitter = (() => {
 
 /* ==========================================================================
    BOOTSTRAP
-   Wires all modules together and starts the application.
    ========================================================================== */
 
 const bootstrap = () => {
+  // FIX: applyGridStyle() now handles both columns and the initial row template
+  // in a single write, removing the previous double-assignment of gridTemplateRows.
   GridSystem.applyGridStyle();
 
   const pool       = GridSystem.buildPool();
@@ -1366,7 +1388,11 @@ const bootstrap = () => {
     DOM.grid.appendChild(el);
     cardStates.push(state);
     PhysicsEngine.attachHoverListeners(state);
-    LazyImageLoader.observe(el);  // must be after appendChild — observer needs el in the DOM
+
+    // Above-the-fold cards already have src set — skip lazy observer for them
+    if (i >= PRIORITY_CARD_COUNT) {
+      LazyImageLoader.observe(el);
+    }
   }
 
   // Delegated click — one listener on the grid rather than one per card
@@ -1377,7 +1403,7 @@ const bootstrap = () => {
     Lightbox.open(Number(cardEl.dataset.poolIdx), cardEl);
   });
 
-  // Keyboard activation for cards (Enter / Space) — pairs with tabindex+role
+  // Keyboard activation for cards (Enter / Space)
   DOM.grid.addEventListener('keydown', (e) => {
     if (e.key !== 'Enter' && e.key !== ' ') return;
     if (DOM.lightbox.classList.contains('on')) return;
