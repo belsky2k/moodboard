@@ -222,15 +222,37 @@ body::after {
   will-change: transform, opacity;
 }
 
-.lb-frame img {
-  display: block;
-  /* Frame is now fixed-size; width/height:100% fills it exactly. */
+/*
+ * DOUBLE-BUFFER FIX — two images stacked inside the frame.
+ *
+ * With a single <img>, changing src forces the browser to clear the old
+ * pixels before the new ones are ready → at least one blank frame on every
+ * navigation, visible as a flash on mobile.
+ *
+ * With two images (lb-img--a / lb-img--b):
+ *   • the "active"  slot is always fully painted, opacity:1
+ *   • the "staging" slot loads the next src silently in the background
+ *   • once staging.decode() resolves (pixels ready), we flip opacity
+ *     in one rAF — old image stays visible right up to that exact frame
+ *   → zero blank frames, zero jitter
+ *
+ * Both images are position:absolute so they share the same layout box.
+ * border-radius is on the frame + overflow:hidden clips both uniformly —
+ * the design's rounded-corner requirement is preserved.
+ */
+.lb-img {
+  position: absolute;
+  inset: 0;
   width:  100%;
   height: 100%;
   object-fit: contain;
   filter: contrast(1.06) saturate(0.85);
-  border-radius: 14px;
+  opacity: 0;
+  pointer-events: none;
+  user-select: none;
 }
+
+.lb-img--active { opacity: 1; }
 
 
 /* ==========================================================================
@@ -489,7 +511,12 @@ body::after {
   <button type="button" class="lb-arrow lb-arrow-l" id="lb-prev" aria-label="Previous image">&#8249;</button>
   <button type="button" class="lb-arrow lb-arrow-r" id="lb-next" aria-label="Next image">&#8250;</button>
   <div class="lb-frame anim-open" id="lb-frame">
-    <img id="lb-img" src="" alt="" />
+    <!--
+      Double-buffer: two images permanently in the DOM.
+      JS always keeps one --active (visible) while the other loads the next src.
+    -->
+    <img id="lb-img-a" class="lb-img lb-img--active" src="" alt="" decoding="async" />
+    <img id="lb-img-b" class="lb-img"                src="" alt="" decoding="async" />
   </div>
   <!--
     FIX: aria-live counter now has two children:
@@ -696,8 +723,9 @@ const DOM = {
   grid:        document.getElementById('grid'),
   lightbox:    document.getElementById('lb'),
   lbFrame:     document.getElementById('lb-frame'),
-  lbImg:       document.getElementById('lb-img'),
-  lbCounterSr: document.getElementById('lb-counter-sr'),    // FIX: split counter
+  lbImgA:      document.getElementById('lb-img-a'),   // double-buffer slot A
+  lbImgB:      document.getElementById('lb-img-b'),   // double-buffer slot B
+  lbCounterSr: document.getElementById('lb-counter-sr'),
   lbCounterVis:document.getElementById('lb-counter-visual'),
   welcome:     document.getElementById('welcome'),
 };
@@ -1181,31 +1209,104 @@ const Lightbox = (() => {
   let totalCount      = 0;
   let poolPaths       = [];
   let clearSrcTimer   = null;
-  let removeFocusTrap = null;   // FIX: cleanup handle for focus trap
+  let removeFocusTrap = null;
+
+  /*
+   * DOUBLE-BUFFER STATE
+   *
+   * activeImg  — currently visible (opacity:1 via .lb-img--active)
+   * stagingImg — hidden (opacity:0), receives next src while old stays painted
+   *
+   * On every navigation:
+   *   1. stagingImg.src = nextSrc              — start fetch, off-screen
+   *   2. await stagingImg.decode()             — pixels fully ready to paint
+   *   3. stagingImg ← .lb-img--active          — now visible, zero blank frame
+   *   4. activeImg  → remove .lb-img--active   — hides instantly
+   *   5. swap roles
+   *
+   * Old image stays visible right up to the exact frame the new one is ready.
+   * This is the canonical solution used by PhotoSwipe, Fancybox, etc.
+   */
+  let activeImg  = DOM.lbImgA;
+  let stagingImg = DOM.lbImgB;
+
+  let _navId = 0;   // monotonic; stale callbacks abort before touching DOM
 
   const isOpen = () => DOM.lightbox.classList.contains('on');
 
-  /**
-   * FIX: counter now writes to two separate DOM nodes:
-   *   • lbCounterSr  — full English sentence for aria-live / screen readers
-   *   • lbCounterVis — visual "X / Y" glyph hidden from AT (aria-hidden)
-   * This avoids screen readers announcing "1 slash 36" while keeping the
-   * compact visual representation.
-   */
   const updateCounter = () => {
     const humanIdx = currentIndex + 1;
     DOM.lbCounterSr.textContent  = `Image ${humanIdx} of ${totalCount}`;
     DOM.lbCounterVis.textContent = `${humanIdx} / ${totalCount}`;
-    DOM.lbImg.alt = `Image ${humanIdx} of ${totalCount}`;
+    activeImg.alt = `Image ${humanIdx} of ${totalCount}`;
+  };
+
+  const playFrameAnimation = (animClass) => {
+    DOM.lbFrame.className = 'lb-frame';
+    void DOM.lbFrame.offsetWidth;   // intentional forced reflow to restart anim
+    DOM.lbFrame.className = `lb-frame ${animClass}`;
+  };
+
+  /** Preload src into browser cache + GPU. Best-effort, never throws. */
+  const preloadImage = (src) => {
+    if (!src) return;
+    const img = new Image();
+    img.decoding = 'async';
+    img.src = src;
+    img.decode?.().catch(() => {});
+  };
+
+  const preloadAdjacent = (idx) => {
+    preloadImage(poolPaths[(idx - 1 + totalCount) % totalCount]);
+    preloadImage(poolPaths[(idx + 1)              % totalCount]);
   };
 
   /**
-   * Restart the frame's CSS animation by forcing a reflow.
+   * Core double-buffer swap.
+   *
+   * Loads nextSrc into the hidden staging slot, waits for decode() to confirm
+   * pixels are composited and ready, then flips opacity in a single rAF.
+   * The active image remains fully visible until that exact frame — zero blanks.
+   *
+   * @param {string}  nextSrc
+   * @param {number}  navId      — captured at call site; stale if _navId moved
+   * @param {boolean} animate
+   * @param {string}  animClass
    */
-  const playFrameAnimation = (animClass) => {
-    DOM.lbFrame.className = 'lb-frame';
-    void DOM.lbFrame.offsetWidth;          // intentional forced reflow
-    DOM.lbFrame.className = `lb-frame ${animClass}`;
+  const swapTo = (nextSrc, navId, animate, animClass) => {
+    if (animate) playFrameAnimation(animClass);
+    updateCounter();
+
+    stagingImg.src = nextSrc;
+    stagingImg.alt = activeImg.alt;
+
+    const doFlip = () => {
+      if (_navId !== navId) return;   // superseded by a faster swipe — discard
+
+      requestAnimationFrame(() => {
+        if (_navId !== navId) return;
+
+        // Both ops in the same rAF: compositor never sees a frame where
+        // neither image is visible.
+        stagingImg.classList.add('lb-img--active');
+        activeImg.classList.remove('lb-img--active');
+
+        // Free the old slot's memory after the compositor is done with it.
+        const prev = activeImg;
+        setTimeout(() => { if (prev !== activeImg) prev.src = ''; }, 100);
+
+        // Roles swap — ready for the next navigation.
+        [activeImg, stagingImg] = [stagingImg, activeImg];
+      });
+    };
+
+    // decode() resolves when pixels are ready to paint (not just downloaded).
+    // Race against 300 ms so a slow connection never freezes the UI;
+    // 300 ms ≈ slide animation length, so worst-case is an end-of-slide swap.
+    const decodeReady = (stagingImg.decode?.() ?? Promise.resolve()).catch(() => {});
+    const timeout     = new Promise(r => setTimeout(r, 300));
+
+    Promise.race([decodeReady, timeout]).then(doFlip);
   };
 
   let _triggerEl = null;
@@ -1216,116 +1317,41 @@ const Lightbox = (() => {
     clearTimeout(clearSrcTimer);
     clearSrcTimer = null;
 
-    _triggerEl = triggerEl ?? null;
-
+    _triggerEl   = triggerEl ?? null;
     currentIndex = poolIndex;
 
-    DOM.lbFrame.className = 'lb-frame anim-open';
+    const thisNavId = ++_navId;
+
     DOM.lightbox.classList.add('on');
-    updateCounter();
+    swapTo(poolPaths[poolIndex], thisNavId, true, 'anim-open');
 
-    const firstSrc = poolPaths[poolIndex];
-    requestAnimationFrame(() => { DOM.lbImg.src = firstSrc; });
-
-    // Warm up neighbours immediately so first swipe feels instant.
     preloadAdjacent(currentIndex);
 
-    // FIX: install focus trap so Tab cycles within the lightbox dialog
     removeFocusTrap = trapFocus(DOM.lightbox);
-
     document.getElementById('lb-close')?.focus();
-  };
-
-  /*
-   * JITTER FIX 3/3 — decode-aware src swap with stale-navigation guard.
-   *
-   * Root cause of the "blank flash" between old and new image on mobile WebKit:
-   * A single rAF is not enough. WebKit decodes images asynchronously; setting
-   * img.src triggers the decode but pixels are not ready until it completes.
-   * Result: old img clears → 1–3 blank frames → new img paints.
-   *
-   * Fix strategy:
-   *   1. Capture a navId so rapid taps discard stale callbacks.
-   *   2. Create an off-screen probe Image with decoding="async".
-   *   3. After probe.onload, call probe.decode() — resolves when pixels are
-   *      composited and ready to paint with zero blank frames.
-   *   4. Race the decode promise against a 250 ms safety timeout so a slow
-   *      connection never freezes the UI. 250 ms ≈ the slide animation
-   *      duration, so in the worst case the swap happens as the animation ends
-   *      — invisible to the user.
-   *   5. On resolution, defer one rAF so the swap lands on the next
-   *      compositor frame (not mid-JS-task, which can tear on some drivers).
-   *   6. After each navigation preload the two neighbouring images so the
-   *      next swipe always hits a warm cache.
-   */
-
-  let _navId = 0;   // monotonic counter; guards stale swap callbacks
-
-  /** Preload src off-screen (decode included) so subsequent navigations are instant. */
-  const preloadImage = (src) => {
-    const img = new Image();
-    img.decoding = 'async';
-    // Start the network fetch; the browser caches the result.
-    // decode() ensures the image is painted-ready, not just downloaded.
-    img.src = src;
-    img.decode?.().catch(() => {}); // silent — preload is best-effort
-  };
-
-  const preloadAdjacent = (idx) => {
-    preloadImage(poolPaths[(idx - 1 + totalCount) % totalCount]);
-    preloadImage(poolPaths[(idx + 1)              % totalCount]);
   };
 
   const navigate = (direction) => {
     currentIndex = (currentIndex + direction + totalCount) % totalCount;
-    const nextSrc   = poolPaths[currentIndex];
-    const thisNavId = ++_navId;   // capture before any async work
-
-    // Slide animation starts immediately — frame has fixed dimensions now,
-    // so the forced reflow in playFrameAnimation does not cause a size jump.
-    playFrameAnimation(direction > 0 ? 'anim-l' : 'anim-r');
-    updateCounter();
-
-    // --- Decode-aware swap ---
-
-    const doSwap = () => requestAnimationFrame(() => {
-      if (_navId !== thisNavId) return;   // user navigated again — skip
-      DOM.lbImg.src = nextSrc;
-    });
-
-    // Build a decode promise: fetch + pixel-ready confirmation.
-    const decodeReady = new Promise((resolve) => {
-      const probe = new Image();
-      probe.decoding = 'async';
-      probe.onload  = () => (probe.decode?.() ?? Promise.resolve())
-                              .then(resolve).catch(resolve);
-      probe.onerror = resolve;   // broken image → still swap, show error state
-      probe.src = nextSrc;
-    });
-
-    // Safety net: never block longer than the slide animation itself.
-    const timeout = new Promise(r => setTimeout(r, 250));
-
-    Promise.race([decodeReady, timeout]).then(doSwap);
-
-    // Warm up neighbours so the next swipe is instant.
+    const thisNavId = ++_navId;
+    swapTo(poolPaths[currentIndex], thisNavId, true,
+           direction > 0 ? 'anim-l' : 'anim-r');
     preloadAdjacent(currentIndex);
   };
 
   const close = () => {
     DOM.lightbox.classList.remove('on');
 
-    // Invalidate any in-flight decode callback so it doesn't overwrite src
-    // after the lightbox is already closed (e.g. user closes mid-navigate).
-    ++_navId;
+    ++_navId;   // invalidate any in-flight decode callback
 
-    // FIX: remove focus trap when lightbox closes
     removeFocusTrap?.();
     removeFocusTrap = null;
 
+    // Defer clearing so the fade-out finishes before images disappear.
     clearSrcTimer = setTimeout(() => {
-      DOM.lbImg.src = '';
-      clearSrcTimer = null;
+      activeImg.src  = '';
+      stagingImg.src = '';
+      clearSrcTimer  = null;
     }, 300);
 
     _triggerEl?.focus();
@@ -1336,9 +1362,6 @@ const Lightbox = (() => {
     poolPaths  = paths;
     totalCount = count;
 
-    // FIX: null-guard all getElementById lookups — static HTML should always
-    // have these elements, but the guard prevents a hard crash if the DOM
-    // is ever patched or the script is embedded in a different context.
     const closeBtn = document.getElementById('lb-close');
     const prevBtn  = document.getElementById('lb-prev');
     const nextBtn  = document.getElementById('lb-next');
@@ -1349,15 +1372,8 @@ const Lightbox = (() => {
 
     closeBtn?.addEventListener('click', close);
 
-    prevBtn?.addEventListener('click', (e) => {
-      e.stopPropagation();
-      navigate(-1);
-    });
-
-    nextBtn?.addEventListener('click', (e) => {
-      e.stopPropagation();
-      navigate(1);
-    });
+    prevBtn?.addEventListener('click', (e) => { e.stopPropagation(); navigate(-1); });
+    nextBtn?.addEventListener('click', (e) => { e.stopPropagation(); navigate(1);  });
 
     const keyHandlers = {
       ArrowLeft:  () => navigate(-1),
@@ -1369,7 +1385,6 @@ const Lightbox = (() => {
       keyHandlers[e.key]?.();
     });
 
-    // Touch swipe — horizontal delta > 48 px triggers navigation
     let swipeStartX = 0;
     DOM.lightbox.addEventListener('touchstart', (e) => {
       swipeStartX = e.touches[0].clientX;
